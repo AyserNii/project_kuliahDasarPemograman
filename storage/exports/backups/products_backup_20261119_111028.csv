@@ -1,0 +1,3 @@
+product_id,sku,name,category,supplier_id,unit,stock_quantity,unit_cost,selling_price,minimum_stock,created_at,supplier_name,supplier_code
+1,BRG-001,susu Ultra 40 g,Minuman,1,pcs,93.00,12000.00,5000.00,20.00,2026-11-19 09:36:46.429470+07:00,Sumber Pangan Nusantara,SUP-001
+2,BRG-002,Teh Melati 100 g,Minuman,1,pcs,75.00,18000.00,25000.00,15.00,2026-11-19 09:36:46.429470+07:00,Sumber Pangan Nusantara,SUP-001
