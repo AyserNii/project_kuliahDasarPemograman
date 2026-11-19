@@ -3,141 +3,141 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 from psycopg.rows import dict_row
 
-from database.connection import get_connection
+from database.connection import buat_koneksi
 
 
-class TransactionRepository:
+class RepositoriTransaksi:
     """Repository untuk operasi tabel transactions di database PostgreSQL."""
 
-    def __init__(self, connection=None):
-        self._connection = connection
+    def __init__(self, koneksi=None):
+        self._koneksi = koneksi
 
-    def _get_conn(self):
-        return self._connection if self._connection else get_connection()
+    def _ambil_koneksi(self):
+        return self._koneksi if self._koneksi else buat_koneksi()
 
-    def get_all(self, limit: int = 100) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
+    def ambil_semua(self, batas: int = 100) -> List[Dict[str, Any]]:
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
                     """
-                    SELECT t.*, p.sku, p.name as product_name, s.name as supplier_name
+                    SELECT t.*, p.sku, p.nama as nama_produk, s.nama as nama_pemasok
                     FROM transactions t
-                    JOIN products p ON t.product_id = p.product_id
-                    LEFT JOIN suppliers s ON t.supplier_id = s.supplier_id
-                    ORDER BY t.transaction_date DESC
+                    JOIN products p ON t.id_produk = p.id_produk
+                    LEFT JOIN suppliers s ON t.id_pemasok = s.id_pemasok
+                    ORDER BY t.tanggal_transaksi DESC
                     LIMIT %s
                     """,
-                    (limit,),
+                    (batas,),
                 )
-                return cur.fetchall()
+                return kursor.fetchall()
 
-    def get_by_product(self, product_id: int, limit: int = 100) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
+    def ambil_berdasarkan_produk(self, id_produk: int, batas: int = 100) -> List[Dict[str, Any]]:
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
                     """
-                    SELECT t.*, p.sku, p.name as product_name, s.name as supplier_name
+                    SELECT t.*, p.sku, p.nama as nama_produk, s.nama as nama_pemasok
                     FROM transactions t
-                    JOIN products p ON t.product_id = p.product_id
-                    LEFT JOIN suppliers s ON t.supplier_id = s.supplier_id
-                    WHERE t.product_id = %s
-                    ORDER BY t.transaction_date DESC
+                    JOIN products p ON t.id_produk = p.id_produk
+                    LEFT JOIN suppliers s ON t.id_pemasok = s.id_pemasok
+                    WHERE t.id_produk = %s
+                    ORDER BY t.tanggal_transaksi DESC
                     LIMIT %s
                     """,
-                    (product_id, limit),
+                    (id_produk, batas),
                 )
-                return cur.fetchall()
+                return kursor.fetchall()
 
-    def get_by_code(self, transaction_code: str) -> Optional[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
+    def ambil_berdasarkan_kode(self, kode_transaksi: str) -> Optional[Dict[str, Any]]:
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
                     """
-                    SELECT t.*, p.sku, p.name as product_name, s.name as supplier_name
+                    SELECT t.*, p.sku, p.nama as nama_produk, s.nama as nama_pemasok
                     FROM transactions t
-                    JOIN products p ON t.product_id = p.product_id
-                    LEFT JOIN suppliers s ON t.supplier_id = s.supplier_id
-                    WHERE t.transaction_code = %s
+                    JOIN products p ON t.id_produk = p.id_produk
+                    LEFT JOIN suppliers s ON t.id_pemasok = s.id_pemasok
+                    WHERE t.kode_transaksi = %s
                     """,
-                    (transaction_code,),
+                    (kode_transaksi,),
                 )
-                return cur.fetchone()
+                return kursor.fetchone()
 
-    def create(
+    def buat(
         self,
-        transaction_code: str,
-        product_id: int,
-        transaction_type: str,
-        quantity: float,
-        unit_cost: float = 0,
-        supplier_id: Optional[int] = None,
-        notes: Optional[str] = None,
-        transaction_date: Optional[datetime] = None,
+        kode_transaksi: str,
+        id_produk: int,
+        jenis_transaksi: str,
+        kuantitas: float,
+        biaya_satuan: float = 0,
+        id_pemasok: Optional[int] = None,
+        catatan: Optional[str] = None,
+        tanggal_transaksi: Optional[datetime] = None,
     ) -> Dict[str, Any]:
         """
-        Mencatat transaksi dan langsung memperbarui stok produk dalam 1 database transaction.
+        Mencatat transaksi dan langsung memperbarui stok produk dalam 1 database transaksi.
         """
-        transaction_type = transaction_type.upper()
-        if transaction_type not in ("IN", "OUT"):
-            raise ValueError("transaction_type harus 'IN' atau 'OUT'")
+        jenis_transaksi = jenis_transaksi.upper()
+        if jenis_transaksi not in ("IN", "OUT"):
+            raise ValueError("jenis_transaksi harus 'IN' atau 'OUT'")
 
-        qty_decimal = Decimal(str(quantity))
-        if qty_decimal <= 0:
+        kuantitas_desimal = Decimal(str(kuantitas))
+        if kuantitas_desimal <= 0:
             raise ValueError("Kuantitas harus lebih besar dari 0")
 
-        cost_decimal = Decimal(str(unit_cost))
-        txn_date = transaction_date or datetime.now(timezone.utc)
+        biaya_desimal = Decimal(str(biaya_satuan))
+        tanggal_transaksi = tanggal_transaksi or datetime.now(timezone.utc)
 
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
                 # Cek ketersediaan stok jika tipe OUT
-                cur.execute(
-                    "SELECT stock_quantity FROM products WHERE product_id = %s FOR UPDATE",
-                    (product_id,),
+                kursor.execute(
+                    "SELECT jumlah_stok FROM products WHERE id_produk = %s FOR UPDATE",
+                    (id_produk,),
                 )
-                prod = cur.fetchone()
-                if not prod:
-                    raise ValueError(f"Produk dengan ID {product_id} tidak ditemukan")
+                produk = kursor.fetchone()
+                if not produk:
+                    raise ValueError(f"Produk dengan ID {id_produk} tidak ditemukan")
 
-                current_stock = prod["stock_quantity"]
-                if transaction_type == "OUT" and current_stock < qty_decimal:
+                stok_saat_ini = produk["jumlah_stok"]
+                if jenis_transaksi == "OUT" and stok_saat_ini < kuantitas_desimal:
                     raise ValueError(
-                        f"Stok tidak mencukupi. Stok saat ini: {current_stock}, diminta: {qty_decimal}"
+                        f"Stok tidak mencukupi. Stok saat ini: {stok_saat_ini}, diminta: {kuantitas_desimal}"
                     )
 
                 # Simpan transaksi
-                cur.execute(
+                kursor.execute(
                     """
                     INSERT INTO transactions (
-                        transaction_code, product_id, supplier_id,
-                        transaction_type, quantity, unit_cost, transaction_date, notes
+                        kode_transaksi, id_produk, id_pemasok,
+                        jenis_transaksi, kuantitas, biaya_satuan, tanggal_transaksi, catatan
                     )
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING *
                     """,
                     (
-                        transaction_code,
-                        product_id,
-                        supplier_id,
-                        transaction_type,
-                        qty_decimal,
-                        cost_decimal,
-                        txn_date,
-                        notes,
+                        kode_transaksi,
+                        id_produk,
+                        id_pemasok,
+                        jenis_transaksi,
+                        kuantitas_desimal,
+                        biaya_desimal,
+                        tanggal_transaksi,
+                        catatan,
                     ),
                 )
-                txn = cur.fetchone()
+                transaksi = kursor.fetchone()
 
                 # Perbarui stok produk
-                stock_diff = qty_decimal if transaction_type == "IN" else -qty_decimal
-                cur.execute(
+                selisih_stok = kuantitas_desimal if jenis_transaksi == "IN" else -kuantitas_desimal
+                kursor.execute(
                     """
                     UPDATE products
-                    SET stock_quantity = stock_quantity + %s
-                    WHERE product_id = %s
+                    SET jumlah_stok = jumlah_stok + %s
+                    WHERE id_produk = %s
                     """,
-                    (stock_diff, product_id),
+                    (selisih_stok, id_produk),
                 )
 
-                conn.commit()
-                return txn
+                koneksi.commit()
+                return transaksi

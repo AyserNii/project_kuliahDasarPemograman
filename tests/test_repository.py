@@ -1,64 +1,64 @@
 import unittest
 import uuid
-from database.connection import get_connection
-from repositories.product_repository import ProductRepository
-from repositories.supplier_repository import SupplierRepository
-from repositories.transaction_repository import TransactionRepository
-from repositories.sales_repository import SalesRepository
-from repositories.analysis_repository import AnalysisRepository
+from database.connection import buat_koneksi
+from repositories.product_repository import RepositoriProduk
+from repositories.supplier_repository import RepositoriPemasok
+from repositories.transaction_repository import RepositoriTransaksi
+from repositories.sales_repository import RepositoriPenjualan
+from repositories.analysis_repository import RepositoriAnalisis
 
 
 class TestRepositories(unittest.TestCase):
     def setUp(self):
-        self.prod_repo = ProductRepository()
-        self.sup_repo = SupplierRepository()
-        self.txn_repo = TransactionRepository()
-        self.sales_repo = SalesRepository()
-        self.analysis_repo = AnalysisRepository()
+        self.prod_repo = RepositoriProduk()
+        self.sup_repo = RepositoriPemasok()
+        self.txn_repo = RepositoriTransaksi()
+        self.repositori_penjualan = RepositoriPenjualan()
+        self.repositori_analisis = RepositoriAnalisis()
 
     def test_database_connection(self):
-        with get_connection() as conn:
-            self.assertIsNotNone(conn)
+        with buat_koneksi() as koneksi:
+            self.assertIsNotNone(koneksi)
 
     def test_supplier_crud(self):
         unique_code = f"TEST-SUP-{uuid.uuid4().hex[:6].upper()}"
-        sup = self.sup_repo.create(
-            supplier_code=unique_code,
-            name="Test Supplier PT",
-            contact_name="Bambang",
-            phone="081299998888",
-            address="Surabaya",
+        pemasok = self.sup_repo.buat(
+            kode_pemasok=unique_code,
+            nama="Test Supplier PT",
+            nama_kontak="Bambang",
+            telepon="081299998888",
+            alamat="Surabaya",
         )
-        self.assertEqual(sup["supplier_code"], unique_code)
+        self.assertEqual(pemasok["kode_pemasok"], unique_code)
 
-        fetched = self.sup_repo.get_by_code(unique_code)
+        fetched = self.sup_repo.ambil_berdasarkan_kode(unique_code)
         self.assertIsNotNone(fetched)
-        self.assertEqual(fetched["name"], "Test Supplier PT")
+        self.assertEqual(fetched["nama"], "Test Supplier PT")
 
         # Cleanup
-        self.sup_repo.delete(sup["supplier_id"])
+        self.sup_repo.hapus(pemasok["id_pemasok"])
 
     def test_product_lifecycle(self):
         unique_sku = f"TEST-BRG-{uuid.uuid4().hex[:6].upper()}"
-        prod = self.prod_repo.create(
+        produk = self.prod_repo.buat(
             sku=unique_sku,
-            name="Barang Percobaan",
-            category="Uji Coba",
-            unit="pcs",
-            stock_quantity=50,
-            unit_cost=10000,
-            selling_price=15000,
-            minimum_stock=10,
+            nama="Barang Percobaan",
+            kategori="Uji Coba",
+            satuan="pcs",
+            jumlah_stok=50,
+            biaya_satuan=10000,
+            harga_jual=15000,
+            stok_minimum=10,
         )
-        self.assertEqual(prod["sku"], unique_sku)
-        self.assertEqual(float(prod["stock_quantity"]), 50.0)
+        self.assertEqual(produk["sku"], unique_sku)
+        self.assertEqual(float(produk["jumlah_stok"]), 50.0)
 
         # Update stok
-        updated = self.prod_repo.update_stock(prod["product_id"], 15)
-        self.assertEqual(float(updated["stock_quantity"]), 65.0)
+        updated = self.prod_repo.perbarui_stok(produk["id_produk"], 15)
+        self.assertEqual(float(updated["jumlah_stok"]), 65.0)
 
         # Cleanup
-        self.prod_repo.delete(prod["product_id"])
+        self.prod_repo.hapus(produk["id_produk"])
 
 
 if __name__ == "__main__":

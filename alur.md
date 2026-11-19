@@ -60,7 +60,7 @@ Sesuai materi perkuliahan Dasar Pemrograman (Pertemuan 7: *Matrix dan Library Pa
 4. **Analisis Deret Waktu & Peramalan (`modules/forecasting.py`)**:
    - Menggunakan `pd.Series(data).rolling(window=window_size).mean()` untuk menghitung pergerakan rata-rata permintaan penjualan (*moving average*).
 5. **Penyajian Data Tabel (`modules/report.py`)**:
-   - Menyediakan fungsi `dataframe_to_string_table(df)` untuk memformat DataFrame menjadi representasi teks tabel yang rapi di CLI.
+   - Menyediakan fungsi `ubah_dataframe_ke_tabel_teks(kerangka_data)` untuk memformat DataFrame menjadi representasi teks tabel yang rapi di CLI.
 
 ---
 
@@ -94,50 +94,51 @@ Sesuai materi perkuliahan Dasar Pemrograman (Pertemuan 7: *Matrix dan Library Pa
     4. `transactions`: Transaksi perpindahan stok (`IN` untuk masuk, `OUT` untuk keluar).
     5. `sales_history`: Riwayat transaksi penjualan ke konsumen.
     6. `inventory_analysis`: Riwayat hasil kalkulasi optimasi EOQ, Safety Stock, dan ROP.
+  - Nama kolom menggunakan bahasa Indonesia; skema juga mengganti nama kolom lama secara otomatis tanpa menghapus datanya.
 - [`database/seed.py`](file:///c:/Users/Resya%20Anggara/project_kuliahDasarPemograman/database/seed.py):
   - Menjalankan file `schema.sql` dan memasukkan data sampel awal (pemasok, produk, transaksi, riwayat penjualan, dan hasil analisis).
 
 ### D. Folder `repositories/` (Data Access Layer)
 Repository bertanggung jawab mengeksekusi perintah SQL (CRUD) dan mengembalikan hasil dalam format dictionary (`psycopg.rows.dict_row`):
 - [`product_repository.py`](file:///c:/Users/Resya%20Anggara/project_kuliahDasarPemograman/repositories/product_repository.py):
-  - Mengambil semua produk, mencari berdasarkan ID atau SKU, menambah produk baru, mengedit data produk, memperbarui stok fisik, menghapus produk, dan memfilter produk dengan stok menipis (`stock_quantity <= minimum_stock`).
+  - Mengambil semua produk, mencari berdasarkan ID atau SKU, menambah produk baru, mengedit data produk, memperbarui stok fisik, menghapus produk, dan memfilter produk dengan stok menipis (`jumlah_stok <= stok_minimum`).
 - [`supplier_repository.py`](file:///c:/Users/Resya%20Anggara/project_kuliahDasarPemograman/repositories/supplier_repository.py):
   - Mengambil daftar supplier, mencari berdasarkan ID atau kode supplier, menambah, mengubah, dan menghapus data pemasok.
 - [`transaction_repository.py`](file:///c:/Users/Resya%20Anggara/project_kuliahDasarPemograman/repositories/transaction_repository.py):
   - Mencatat riwayat transaksi persediaan (`IN` / `OUT`).
-  - Secara transaksional memperbarui `stock_quantity` produk (+ jika `IN`, - jika `OUT`).
+  - Secara transaksional memperbarui `jumlah_stok` produk (+ jika `IN`, - jika `OUT`).
   - Mencegah stok menjadi minus jika kuantitas `OUT` melebihi stok yang ada.
 - [`sales_repository.py`](file:///c:/Users/Resya%20Anggara/project_kuliahDasarPemograman/repositories/sales_repository.py):
   - Mencatat penjualan baru ke `sales_history` sekaligus membuat transaksi `OUT` dan mengurangi stok produk.
-  - Fungsi `get_daily_sales()` mengagregasi data penjualan per tanggal untuk kebutuhan perhitungan peramalan permintaan.
+  - Fungsi `ambil_penjualan_harian()` mengagregasi data penjualan per tanggal untuk kebutuhan perhitungan peramalan permintaan.
 - [`analysis_repository.py`](file:///c:/Users/Resya%20Anggara/project_kuliahDasarPemograman/repositories/analysis_repository.py):
-  - Menyimpan hasil optimasi inventaris (`eoq`, `safety_stock`, `reorder_point`) ke tabel `inventory_analysis` menggunakan mekanisme `ON CONFLICT DO UPDATE`.
+  - Menyimpan hasil optimasi persediaan (`kuantitas_pemesanan_ekonomis`, `stok_pengaman`, `titik_pemesanan_ulang`) ke tabel `inventory_analysis` menggunakan mekanisme `ON CONFLICT DO UPDATE`.
   - Mengambil riwayat analisis terkini untuk masing-masing produk.
 
 ### E. Folder `modules/` (Business Logic & Calculations)
 - [`inventory.py`](file:///c:/Users/Resya%20Anggara/project_kuliahDasarPemograman/modules/inventory.py):
-  - `calculate_eoq(D, S, H)`: Menghitung kuantitas pemesanan ekonomis:
+  - `hitung_kuantitas_pemesanan_ekonomis(permintaan_tahunan, biaya_pemesanan, biaya_penyimpanan_per_unit_tahun)`: Menghitung kuantitas pemesanan ekonomis:
     $$\text{EOQ} = \sqrt{\frac{2 \times D \times S}{H}}$$
-  - `calculate_safety_stock(stddev, L, Z)`: Menghitung stok pengaman untuk mengantisipasi ketidakpastian permintaan selama waktu tunggu:
+  - `hitung_stok_pengaman(simpangan_baku_permintaan_harian, waktu_tunggu_hari, skor_z)`: Menghitung stok pengaman untuk mengantisipasi ketidakpastian permintaan selama waktu tunggu:
     $$\text{SS} = Z \times \sigma_d \times \sqrt{L}$$
-  - `calculate_reorder_point(avg_demand, L, SS)`: Menghitung titik batas stok untuk memesan kembali:
+  - `hitung_titik_pemesanan_ulang(rata_rata_permintaan_harian, waktu_tunggu_hari, stok_pengaman)`: Menghitung titik batas stok untuk memesan kembali:
     $$\text{ROP} = (d \times L) + \text{SS}$$
-  - `calculate_inventory_costs(...)`: Menghitung biaya simpan tahunan, biaya pesan tahunan, dan total biaya variabel persediaan.
+  - `hitung_biaya_persediaan(...)`: Menghitung biaya simpan tahunan, biaya pesan tahunan, dan total biaya variabel persediaan.
 - [`forecasting.py`](file:///c:/Users/Resya%20Anggara/project_kuliahDasarPemograman/modules/forecasting.py):
-  - `moving_average()`: Peramalan permintaan periode berikutnya berbasis rata-rata bergerak.
-  - `pandas_rolling_forecast()`: Menghitung deret moving average menggunakan `pandas.Series.rolling()`.
-  - `weighted_moving_average()`: Moving average berbobot.
-  - `exponential_smoothing()`: Pemulusan eksponensial tunggal (Single Exponential Smoothing).
-  - `calculate_demand_statistics()`: Menghitung rata-rata permintaan harian, standar deviasi, dan proyeksi permintaan tahunan.
+  - `rata_rata_bergerak()`: Peramalan permintaan periode berikutnya berbasis rata-rata bergerak.
+  - `peramalan_rata_rata_bergerak_pandas()`: Menghitung deret rata-rata bergerak menggunakan `pandas.Series.rolling()`.
+  - `rata_rata_bergerak_tertimbang()`: Rata-rata bergerak berbobot.
+  - `pemulusan_eksponensial()`: Pemulusan eksponensial tunggal.
+  - `hitung_statistik_permintaan()`: Menghitung rata-rata permintaan harian, standar deviasi, dan proyeksi permintaan tahunan.
 - [`analysis.py`](file:///c:/Users/Resya%20Anggara/project_kuliahDasarPemograman/modules/analysis.py):
-  - `determine_stock_status()`: Menentukan status kesehatan stok (`HABIS`, `KRITIS`, `PERLU REORDER`, atau `AMAN`).
-  - `compare_inventory_policies()`: Membandingkan total biaya kebijakan pemesanan konvensional vs kebijakan EOQ dan menghitung persentase penghematan biaya.
-  - `generate_recommendation()`: Menghasilkan rekomendasi tindakan konkret untuk staf gudang/manajer inventaris.
+  - `tentukan_status_stok()`: Menentukan status kesehatan stok (`HABIS`, `KRITIS`, `PERLU REORDER`, atau `AMAN`).
+  - `bandingkan_kebijakan_persediaan()`: Membandingkan total biaya kebijakan pemesanan konvensional vs kebijakan EOQ dan menghitung persentase penghematan biaya.
+  - `buat_rekomendasi()`: Menghasilkan rekomendasi tindakan konkret untuk staf gudang/manajer persediaan.
 - [`validation.py`](file:///c:/Users/Resya%20Anggara/project_kuliahDasarPemograman/modules/validation.py):
   - Validasi angka positif, angka non-negatif, string wajib isi, format SKU, tipe transaksi, dan format tanggal.
 - [`report.py`](file:///c:/Users/Resya%20Anggara/project_kuliahDasarPemograman/modules/report.py):
-  - Format tabel bergaris ASCII (`format_table`).
-  - Integrasi representasi tabel Pandas DataFrame (`dataframe_to_string_table`).
+  - Format tabel bergaris ASCII (`format_tabel`).
+  - Integrasi representasi tabel Pandas DataFrame (`ubah_dataframe_ke_tabel_teks`).
   - Penyusunan ringkasan aset inventaris dan penyimpanan ke file teks di [`output/reports/`](file:///c:/Users/Resya%20Anggara/project_kuliahDasarPemograman/output/reports/).
   - Visualisasi grafik batang di terminal (ASCII bar chart) serta dukungan pembuatan grafik PNG jika `matplotlib` tersedia.
 - [`cli_menu.py`](file:///c:/Users/Resya%20Anggara/project_kuliahDasarPemograman/modules/cli_menu.py):
@@ -178,18 +179,18 @@ Repository bertanggung jawab mengeksekusi perintah SQL (CRUD) dan mengembalikan 
 4. Repositori memulai transaksi PostgreSQL:
    - Jika tipe `OUT`, sistem mengecek apakah stok mencukupi (menggunakan `SELECT ... FOR UPDATE`).
    - Menyimpan record transaksi ke tabel `transactions`.
-   - Mengubah kolom `stock_quantity` pada tabel `products` secara otomatis.
+   - Mengubah kolom `jumlah_stok` pada tabel `products` secara otomatis.
    - Komit transaksi database.
 5. CLI menampilkan pesan sukses beserta jumlah stok fisik terbaru.
 
 ### B. Alur Pencatatan Penjualan (Sales)
 1. Pengguna memilih menu **4 (Riwayat Penjualan)** -> **Catat Penjualan Baru**.
 2. Pengguna menginput ID produk, jumlah terjual, dan harga jual satuan.
-3. `cli_menu.py` memanggil `sales_repo.record_sale()`.
+3. `cli_menu.py` memanggil `repositori_penjualan.catat_penjualan()`.
 4. Repositori secara atomik:
    - Membuat baris transaksi `OUT` pada tabel `transactions`.
    - Mengurangi stok produk di tabel `products`.
-   - Menyimpan data penjualan pada tabel `sales_history` dengan mereferensikan `transaction_id`.
+   - Menyimpan data penjualan pada tabel `sales_history` dengan mereferensikan `id_transaksi`.
 5. Data penjualan siap digunakan sebagai basis data histori permintaan (*demand forecasting*).
 
 ### C. Alur Perhitungan & Optimasi Inventory (EOQ & ROP)

@@ -1,102 +1,102 @@
 from typing import Any, Dict, List, Optional
 from psycopg.rows import dict_row
 
-from database.connection import get_connection
+from database.connection import buat_koneksi
 
 
-class SupplierRepository:
+class RepositoriPemasok:
     """Repository untuk operasi tabel suppliers di database PostgreSQL."""
 
-    def __init__(self, connection=None):
-        self._connection = connection
+    def __init__(self, koneksi=None):
+        self._koneksi = koneksi
 
-    def _get_conn(self):
-        return self._connection if self._connection else get_connection()
+    def _ambil_koneksi(self):
+        return self._koneksi if self._koneksi else buat_koneksi()
 
-    def get_all(self) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
+    def ambil_semua(self) -> List[Dict[str, Any]]:
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
                     """
                     SELECT * FROM suppliers
-                    ORDER BY supplier_id ASC
+                    ORDER BY id_pemasok ASC
                     """
                 )
-                return cur.fetchall()
+                return kursor.fetchall()
 
-    def get_by_id(self, supplier_id: int) -> Optional[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
-                    "SELECT * FROM suppliers WHERE supplier_id = %s",
-                    (supplier_id,),
+    def ambil_berdasarkan_id(self, id_pemasok: int) -> Optional[Dict[str, Any]]:
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
+                    "SELECT * FROM suppliers WHERE id_pemasok = %s",
+                    (id_pemasok,),
                 )
-                return cur.fetchone()
+                return kursor.fetchone()
 
-    def get_by_code(self, supplier_code: str) -> Optional[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
-                    "SELECT * FROM suppliers WHERE supplier_code = %s",
-                    (supplier_code,),
+    def ambil_berdasarkan_kode(self, kode_pemasok: str) -> Optional[Dict[str, Any]]:
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
+                    "SELECT * FROM suppliers WHERE kode_pemasok = %s",
+                    (kode_pemasok,),
                 )
-                return cur.fetchone()
+                return kursor.fetchone()
 
-    def create(
+    def buat(
         self,
-        supplier_code: str,
-        name: str,
-        contact_name: Optional[str] = None,
-        phone: Optional[str] = None,
-        address: Optional[str] = None,
+        kode_pemasok: str,
+        nama: str,
+        nama_kontak: Optional[str] = None,
+        telepon: Optional[str] = None,
+        alamat: Optional[str] = None,
     ) -> Dict[str, Any]:
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
                     """
-                    INSERT INTO suppliers (supplier_code, name, contact_name, phone, address)
+                    INSERT INTO suppliers (kode_pemasok, nama, nama_kontak, telepon, alamat)
                     VALUES (%s, %s, %s, %s, %s)
                     RETURNING *
                     """,
-                    (supplier_code, name, contact_name, phone, address),
+                    (kode_pemasok, nama, nama_kontak, telepon, alamat),
                 )
-                result = cur.fetchone()
-                conn.commit()
-                return result
+                hasil = kursor.fetchone()
+                koneksi.commit()
+                return hasil
 
-    def update(
+    def perbarui(
         self,
-        supplier_id: int,
-        name: str,
-        contact_name: Optional[str] = None,
-        phone: Optional[str] = None,
-        address: Optional[str] = None,
+        id_pemasok: int,
+        nama: str,
+        nama_kontak: Optional[str] = None,
+        telepon: Optional[str] = None,
+        alamat: Optional[str] = None,
     ) -> Optional[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
                     """
                     UPDATE suppliers
-                    SET name = %s,
-                        contact_name = %s,
-                        phone = %s,
-                        address = %s
-                    WHERE supplier_id = %s
+                    SET nama = %s,
+                        nama_kontak = %s,
+                        telepon = %s,
+                        alamat = %s
+                    WHERE id_pemasok = %s
                     RETURNING *
                     """,
-                    (name, contact_name, phone, address, supplier_id),
+                    (nama, nama_kontak, telepon, alamat, id_pemasok),
                 )
-                result = cur.fetchone()
-                conn.commit()
-                return result
+                hasil = kursor.fetchone()
+                koneksi.commit()
+                return hasil
 
-    def delete(self, supplier_id: int) -> bool:
-        with self._get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "DELETE FROM suppliers WHERE supplier_id = %s",
-                    (supplier_id,),
+    def hapus(self, id_pemasok: int) -> bool:
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor() as kursor:
+                kursor.execute(
+                    "DELETE FROM suppliers WHERE id_pemasok = %s",
+                    (id_pemasok,),
                 )
-                deleted = cur.rowcount > 0
-                conn.commit()
-                return deleted
+                terhapus = kursor.rowcount > 0
+                koneksi.commit()
+                return terhapus

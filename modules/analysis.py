@@ -1,8 +1,8 @@
 from typing import Any, Dict
-from modules.inventory import calculate_inventory_costs
+from modules.inventory import hitung_biaya_persediaan
 
 
-def determine_stock_status(current_stock: float, reorder_point: float, safety_stock: float = 0) -> str:
+def tentukan_status_stok(stok_saat_ini: float, titik_pemesanan_ulang: float, stok_pengaman: float = 0) -> str:
     """
     Menentukan status kesehatan stok produk:
     - HABIS: Stok 0 atau kurang
@@ -10,74 +10,74 @@ def determine_stock_status(current_stock: float, reorder_point: float, safety_st
     - PERLU REORDER: Stok di bawah atau sama dengan Reorder Point
     - AMAN: Stok berada di atas Reorder Point
     """
-    curr = float(current_stock)
-    rop = float(reorder_point)
-    ss = float(safety_stock)
+    stok = float(stok_saat_ini)
+    titik_pemesanan_ulang = float(titik_pemesanan_ulang)
+    stok_pengaman = float(stok_pengaman)
 
-    if curr <= 0:
+    if stok <= 0:
         return "HABIS"
-    if ss > 0 and curr <= ss:
+    if stok_pengaman > 0 and stok <= stok_pengaman:
         return "KRITIS"
-    if curr <= rop:
+    if stok <= titik_pemesanan_ulang:
         return "PERLU REORDER"
     return "AMAN"
 
 
-def compare_inventory_policies(
-    annual_demand: float,
-    current_order_qty: float,
-    eoq_qty: float,
-    ordering_cost: float,
-    holding_cost_per_unit_year: float,
+def bandingkan_kebijakan_persediaan(
+    permintaan_tahunan: float,
+    kuantitas_pemesanan_saat_ini: float,
+    kuantitas_pemesanan_ekonomis: float,
+    biaya_pemesanan: float,
+    biaya_penyimpanan_per_unit_tahun: float,
 ) -> Dict[str, Any]:
     """
     Membandingkan biaya kebijakan pemesanan konvensional (saat ini) dengan kebijakan EOQ.
     Menghitung potensi penghematan biaya operasional persediaan.
     """
-    current_costs = calculate_inventory_costs(
-        annual_demand, current_order_qty, ordering_cost, holding_cost_per_unit_year
+    biaya_saat_ini = hitung_biaya_persediaan(
+        permintaan_tahunan, kuantitas_pemesanan_saat_ini, biaya_pemesanan, biaya_penyimpanan_per_unit_tahun
     )
-    eoq_costs = calculate_inventory_costs(
-        annual_demand, eoq_qty, ordering_cost, holding_cost_per_unit_year
+    biaya_pemesanan_ekonomis = hitung_biaya_persediaan(
+        permintaan_tahunan, kuantitas_pemesanan_ekonomis, biaya_pemesanan, biaya_penyimpanan_per_unit_tahun
     )
 
-    savings = current_costs["total_cost"] - eoq_costs["total_cost"]
-    savings_pct = (savings / current_costs["total_cost"] * 100) if current_costs["total_cost"] > 0 else 0
+    penghematan = biaya_saat_ini["total_biaya"] - biaya_pemesanan_ekonomis["total_biaya"]
+    persentase_penghematan = (penghematan / biaya_saat_ini["total_biaya"] * 100) if biaya_saat_ini["total_biaya"] > 0 else 0
 
     return {
-        "current_policy": current_costs,
-        "eoq_policy": eoq_costs,
-        "annual_savings": round(max(0.0, savings), 2),
-        "savings_percentage": round(max(0.0, savings_pct), 2),
+        "kebijakan_saat_ini": biaya_saat_ini,
+        "kebijakan_pemesanan_ekonomis": biaya_pemesanan_ekonomis,
+        "penghematan_tahunan": round(max(0.0, penghematan), 2),
+        "persentase_penghematan": round(max(0.0, persentase_penghematan), 2),
     }
 
 
-def generate_recommendation(
-    product_name: str,
-    current_stock: float,
-    reorder_point: float,
-    safety_stock: float,
-    eoq: float,
+def buat_rekomendasi(
+    nama_produk: str,
+    stok_saat_ini: float,
+    titik_pemesanan_ulang: float,
+    stok_pengaman: float,
+    kuantitas_pemesanan_ekonomis: float,
 ) -> Dict[str, Any]:
     """
     Menghasilkan rekomendasi tindakan konkret untuk manajemen persediaan barang.
     """
-    status = determine_stock_status(current_stock, reorder_point, safety_stock)
+    status = tentukan_status_stok(stok_saat_ini, titik_pemesanan_ulang, stok_pengaman)
 
     if status in ("HABIS", "KRITIS", "PERLU REORDER"):
-        action = f"Lakukan pemesanan ulang segera sebesar {eoq:.0f} unit (sesuai EOQ)."
-        priority = "TINGGI" if status in ("HABIS", "KRITIS") else "SEDANG"
+        tindakan = f"Lakukan pemesanan ulang segera sebesar {kuantitas_pemesanan_ekonomis:.0f} unit (sesuai EOQ)."
+        prioritas = "TINGGI" if status in ("HABIS", "KRITIS") else "SEDANG"
     else:
-        action = "Stok masih mencukupi. Pertahankan tingkat persediaan saat ini."
-        priority = "RENDAH"
+        tindakan = "Stok masih mencukupi. Pertahankan tingkat persediaan saat ini."
+        prioritas = "RENDAH"
 
     return {
-        "product_name": product_name,
-        "current_stock": round(float(current_stock), 2),
-        "reorder_point": round(float(reorder_point), 2),
-        "safety_stock": round(float(safety_stock), 2),
-        "eoq": round(float(eoq), 2),
+        "nama_produk": nama_produk,
+        "stok_saat_ini": round(float(stok_saat_ini), 2),
+        "titik_pemesanan_ulang": round(float(titik_pemesanan_ulang), 2),
+        "stok_pengaman": round(float(stok_pengaman), 2),
+        "kuantitas_pemesanan_ekonomis": round(float(kuantitas_pemesanan_ekonomis), 2),
         "status": status,
-        "priority": priority,
-        "action": action,
+        "prioritas": prioritas,
+        "tindakan": tindakan,
     }

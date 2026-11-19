@@ -3,14 +3,14 @@ from pathlib import Path
 from typing import Optional
 import pandas as pd
 
-from config.settings import EXPORT_BACKUPS_DIR, EXPORT_REPORTS_DIR
-from repositories.analysis_repository import AnalysisRepository
-from repositories.product_repository import ProductRepository
-from repositories.sales_repository import SalesRepository
-from repositories.transaction_repository import TransactionRepository
+from config.settings import DIREKTORI_CADANGAN_EKSPOR, DIREKTORI_LAPORAN_EKSPOR
+from repositories.analysis_repository import RepositoriAnalisis
+from repositories.product_repository import RepositoriProduk
+from repositories.sales_repository import RepositoriPenjualan
+from repositories.transaction_repository import RepositoriTransaksi
 
 
-class ExportService:
+class LayananEkspor:
     """
     Service untuk mengekspor data PostgreSQL menjadi format CSV
     menggunakan library Pandas DataFrame (to_csv).
@@ -18,52 +18,52 @@ class ExportService:
 
     def __init__(
         self,
-        product_repo: ProductRepository = None,
-        transaction_repo: TransactionRepository = None,
-        sales_repo: SalesRepository = None,
-        analysis_repo: AnalysisRepository = None,
+        repositori_produk: RepositoriProduk = None,
+        repositori_transaksi: RepositoriTransaksi = None,
+        repositori_penjualan: RepositoriPenjualan = None,
+        repositori_analisis: RepositoriAnalisis = None,
     ):
-        self.product_repo = product_repo or ProductRepository()
-        self.transaction_repo = transaction_repo or TransactionRepository()
-        self.sales_repo = sales_repo or SalesRepository()
-        self.analysis_repo = analysis_repo or AnalysisRepository()
+        self.repositori_produk = repositori_produk or RepositoriProduk()
+        self.repositori_transaksi = repositori_transaksi or RepositoriTransaksi()
+        self.repositori_penjualan = repositori_penjualan or RepositoriPenjualan()
+        self.repositori_analisis = repositori_analisis or RepositoriAnalisis()
 
-    def export_products_csv(self, output_path: Optional[Path] = None) -> Path:
+    def ekspor_produk_ke_csv(self, jalur_keluaran: Optional[Path] = None) -> Path:
         """Export seluruh data produk ke file CSV via Pandas DataFrame."""
-        products = self.product_repo.get_all()
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        target_file = output_path or (EXPORT_BACKUPS_DIR / f"products_backup_{timestamp}.csv")
+        daftar_produk = self.repositori_produk.ambil_semua()
+        cap_waktu = datetime.now().strftime("%Y%m%d_%H%M%S")
+        berkas_tujuan = jalur_keluaran or (DIREKTORI_CADANGAN_EKSPOR / f"products_backup_{cap_waktu}.csv")
 
-        df = pd.DataFrame(products)
-        df.to_csv(target_file, index=False)
-        return target_file
+        kerangka_data = pd.DataFrame(daftar_produk)
+        kerangka_data.to_csv(berkas_tujuan, index=False)
+        return berkas_tujuan
 
-    def export_transactions_csv(self, output_path: Optional[Path] = None) -> Path:
+    def ekspor_transaksi_ke_csv(self, jalur_keluaran: Optional[Path] = None) -> Path:
         """Export riwayat transaksi masuk & keluar ke file CSV via Pandas DataFrame."""
-        transactions = self.transaction_repo.get_all(limit=1000)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        target_file = output_path or (EXPORT_BACKUPS_DIR / f"transactions_backup_{timestamp}.csv")
+        daftar_transaksi = self.repositori_transaksi.ambil_semua(batas=1000)
+        cap_waktu = datetime.now().strftime("%Y%m%d_%H%M%S")
+        berkas_tujuan = jalur_keluaran or (DIREKTORI_CADANGAN_EKSPOR / f"transactions_backup_{cap_waktu}.csv")
 
-        df = pd.DataFrame(transactions)
-        df.to_csv(target_file, index=False)
-        return target_file
+        kerangka_data = pd.DataFrame(daftar_transaksi)
+        kerangka_data.to_csv(berkas_tujuan, index=False)
+        return berkas_tujuan
 
-    def export_sales_csv(self, output_path: Optional[Path] = None) -> Path:
+    def ekspor_penjualan_ke_csv(self, jalur_keluaran: Optional[Path] = None) -> Path:
         """Export riwayat penjualan ke file CSV via Pandas DataFrame."""
-        sales = self.sales_repo.get_all(limit=1000)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        target_file = output_path or (EXPORT_REPORTS_DIR / f"sales_report_{timestamp}.csv")
+        daftar_penjualan = self.repositori_penjualan.ambil_semua(batas=1000)
+        cap_waktu = datetime.now().strftime("%Y%m%d_%H%M%S")
+        berkas_tujuan = jalur_keluaran or (DIREKTORI_LAPORAN_EKSPOR / f"sales_report_{cap_waktu}.csv")
 
-        df = pd.DataFrame(sales)
-        df.to_csv(target_file, index=False)
-        return target_file
+        kerangka_data = pd.DataFrame(daftar_penjualan)
+        kerangka_data.to_csv(berkas_tujuan, index=False)
+        return berkas_tujuan
 
-    def export_inventory_analysis_csv(self, output_path: Optional[Path] = None) -> Path:
+    def ekspor_analisis_persediaan_ke_csv(self, jalur_keluaran: Optional[Path] = None) -> Path:
         """Export hasil perhitungan optimasi persediaan (EOQ, ROP, SS) ke file CSV via Pandas."""
-        analyses = self.analysis_repo.get_all_latest()
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        target_file = output_path or (EXPORT_REPORTS_DIR / f"inventory_analysis_{timestamp}.csv")
+        daftar_analisis = self.repositori_analisis.ambil_semua_terbaru()
+        cap_waktu = datetime.now().strftime("%Y%m%d_%H%M%S")
+        berkas_tujuan = jalur_keluaran or (DIREKTORI_LAPORAN_EKSPOR / f"inventory_analysis_{cap_waktu}.csv")
 
-        df = pd.DataFrame(analyses)
-        df.to_csv(target_file, index=False)
-        return target_file
+        kerangka_data = pd.DataFrame(daftar_analisis)
+        kerangka_data.to_csv(berkas_tujuan, index=False)
+        return berkas_tujuan

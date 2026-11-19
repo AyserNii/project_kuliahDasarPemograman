@@ -1,14 +1,37 @@
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import List, Tuple
 import pandas as pd
 
-from config.settings import IMPORTS_DIR
-from repositories.product_repository import ProductRepository
-from repositories.supplier_repository import SupplierRepository
+from config.settings import DIREKTORI_IMPOR
+from repositories.product_repository import RepositoriProduk
+from repositories.supplier_repository import RepositoriPemasok
 
 
-class ImportService:
+def _normalkan_kolom_csv_lama(kerangka_data: pd.DataFrame) -> pd.DataFrame:
+    """Menerima nama kolom CSV lama sambil menormalkannya ke bahasa Indonesia."""
+    pemetaan_kolom = {
+        "name": "nama",
+        "category": "kategori",
+        "supplier_code": "kode_pemasok",
+        "contact_name": "nama_kontak",
+        "phone": "telepon",
+        "address": "alamat",
+        "unit": "satuan",
+        "stock_quantity": "jumlah_stok",
+        "unit_cost": "biaya_satuan",
+        "selling_price": "harga_jual",
+        "minimum_stock": "stok_minimum",
+    }
+    perubahan = {
+        kolom_lama: kolom_baru
+        for kolom_lama, kolom_baru in pemetaan_kolom.items()
+        if kolom_lama in kerangka_data.columns
+        and kolom_baru not in kerangka_data.columns
+    }
+    return kerangka_data.rename(columns=perubahan)
+
+
+class LayananImpor:
     """
     Service untuk membaca file CSV menggunakan library Pandas (pd.read_csv)
     dan menyimpannya ke database PostgreSQL.
@@ -16,144 +39,148 @@ class ImportService:
 
     def __init__(
         self,
-        product_repo: ProductRepository = None,
-        supplier_repo: SupplierRepository = None,
+        repositori_produk: RepositoriProduk = None,
+        repositori_pemasok: RepositoriPemasok = None,
     ):
-        self.product_repo = product_repo or ProductRepository()
-        self.supplier_repo = supplier_repo or SupplierRepository()
+        self.repositori_produk = repositori_produk or RepositoriProduk()
+        self.repositori_pemasok = repositori_pemasok or RepositoriPemasok()
 
-    def import_suppliers_from_csv(self, file_path: Path) -> Tuple[int, int, List[str]]:
+    def impor_pemasok_dari_csv(self, jalur_berkas: Path) -> Tuple[int, int, List[str]]:
         """
-        Import data supplier dari file CSV menggunakan Pandas DataFrame.
-        Format kolom: supplier_code, name, contact_name, phone, address
+        Import data pemasok dari file CSV menggunakan Pandas DataFrame.
+        Format kolom: kode_pemasok, nama, nama_kontak, telepon, alamat
         """
-        if not file_path.exists():
-            raise FileNotFoundError(f"File tidak ditemukan: {file_path}")
+        if not jalur_berkas.exists():
+            raise FileNotFoundError(f"File tidak ditemukan: {jalur_berkas}")
 
         # Membaca data CSV ke dalam Pandas DataFrame
-        df = pd.read_csv(file_path, dtype=str).fillna("")
+        kerangka_data = _normalkan_kolom_csv_lama(
+            pd.read_csv(jalur_berkas, dtype=str).fillna("")
+        )
 
-        success_count = 0
-        fail_count = 0
-        errors = []
+        jumlah_berhasil = 0
+        jumlah_gagal = 0
+        daftar_kesalahan = []
 
-        for index, row in df.iterrows():
-            row_num = index + 2  # Nomor baris pada file CSV (termasuk header)
+        for indeks, baris in kerangka_data.iterrows():
+            nomor_baris = indeks + 2  # Nomor baris pada file CSV (termasuk header)
             try:
-                code = str(row.get("supplier_code", "")).strip().upper()
-                name = str(row.get("name", "")).strip()
+                kode = str(baris.get("kode_pemasok", "")).strip().upper()
+                nama = str(baris.get("nama", "")).strip()
 
-                if not code or not name:
-                    raise ValueError("supplier_code dan name wajib diisi")
+                if not kode or not nama:
+                    raise ValueError("kode_pemasok dan nama wajib diisi")
 
-                existing = self.supplier_repo.get_by_code(code)
-                if existing:
-                    errors.append(f"Baris {row_num}: Supplier dengan kode {code} sudah terdaftar.")
-                    fail_count += 1
+                data_tersedia = self.repositori_pemasok.ambil_berdasarkan_kode(kode)
+                if data_tersedia:
+                    daftar_kesalahan.append(f"Baris {nomor_baris}: Supplier dengan kode {kode} sudah terdaftar.")
+                    jumlah_gagal += 1
                     continue
 
-                contact = str(row.get("contact_name", "")).strip() or None
-                phone = str(row.get("phone", "")).strip() or None
-                address = str(row.get("address", "")).strip() or None
+                kontak = str(baris.get("nama_kontak", "")).strip() or None
+                telepon = str(baris.get("telepon", "")).strip() or None
+                alamat = str(baris.get("alamat", "")).strip() or None
 
-                self.supplier_repo.create(
-                    supplier_code=code,
-                    name=name,
-                    contact_name=contact,
-                    phone=phone,
-                    address=address,
+                self.repositori_pemasok.buat(
+                    kode_pemasok=kode,
+                    nama=nama,
+                    nama_kontak=kontak,
+                    telepon=telepon,
+                    alamat=alamat,
                 )
-                success_count += 1
-            except Exception as err:
-                fail_count += 1
-                errors.append(f"Baris {row_num}: {err}")
+                jumlah_berhasil += 1
+            except Exception as kesalahan:
+                jumlah_gagal += 1
+                daftar_kesalahan.append(f"Baris {nomor_baris}: {kesalahan}")
 
-        return success_count, fail_count, errors
+        return jumlah_berhasil, jumlah_gagal, daftar_kesalahan
 
-    def import_products_from_csv(self, file_path: Path) -> Tuple[int, int, List[str]]:
+    def impor_produk_dari_csv(self, jalur_berkas: Path) -> Tuple[int, int, List[str]]:
         """
         Import data produk dari file CSV menggunakan Pandas DataFrame.
-        Format kolom: sku, name, category, supplier_code, unit, stock_quantity, unit_cost, selling_price, minimum_stock
+        Format kolom: sku, nama, kategori, kode_pemasok, satuan, jumlah_stok, biaya_satuan, harga_jual, stok_minimum
         """
-        if not file_path.exists():
-            raise FileNotFoundError(f"File tidak ditemukan: {file_path}")
+        if not jalur_berkas.exists():
+            raise FileNotFoundError(f"File tidak ditemukan: {jalur_berkas}")
 
         # Membaca data CSV ke dalam Pandas DataFrame
-        df = pd.read_csv(file_path, dtype=str).fillna("")
+        kerangka_data = _normalkan_kolom_csv_lama(
+            pd.read_csv(jalur_berkas, dtype=str).fillna("")
+        )
 
-        success_count = 0
-        fail_count = 0
-        errors = []
+        jumlah_berhasil = 0
+        jumlah_gagal = 0
+        daftar_kesalahan = []
 
-        for index, row in df.iterrows():
-            row_num = index + 2
+        for indeks, baris in kerangka_data.iterrows():
+            nomor_baris = indeks + 2
             try:
-                sku = str(row.get("sku", "")).strip().upper()
-                name = str(row.get("name", "")).strip()
+                sku = str(baris.get("sku", "")).strip().upper()
+                nama = str(baris.get("nama", "")).strip()
 
-                if not sku or not name:
-                    raise ValueError("sku dan name wajib diisi")
+                if not sku or not nama:
+                    raise ValueError("sku dan nama wajib diisi")
 
-                existing = self.product_repo.get_by_sku(sku)
-                if existing:
-                    errors.append(f"Baris {row_num}: Produk dengan SKU {sku} sudah terdaftar.")
-                    fail_count += 1
+                data_tersedia = self.repositori_produk.ambil_berdasarkan_sku(sku)
+                if data_tersedia:
+                    daftar_kesalahan.append(f"Baris {nomor_baris}: Produk dengan SKU {sku} sudah terdaftar.")
+                    jumlah_gagal += 1
                     continue
 
                 # Pencocokan supplier
-                supplier_id = None
-                sup_code = str(row.get("supplier_code", "")).strip().upper()
-                if sup_code:
-                    sup = self.supplier_repo.get_by_code(sup_code)
-                    if sup:
-                        supplier_id = sup["supplier_id"]
+                id_pemasok = None
+                kode_pemasok = str(baris.get("kode_pemasok", "")).strip().upper()
+                if kode_pemasok:
+                    pemasok = self.repositori_pemasok.ambil_berdasarkan_kode(kode_pemasok)
+                    if pemasok:
+                        id_pemasok = pemasok["id_pemasok"]
 
-                unit = str(row.get("unit", "")).strip() or "pcs"
-                stock = float(row.get("stock_quantity", 0) or 0)
-                cost = float(row.get("unit_cost", 0) or 0)
-                price = float(row.get("selling_price", 0) or 0)
-                min_stock = float(row.get("minimum_stock", 0) or 0)
+                satuan = str(baris.get("satuan", "")).strip() or "pcs"
+                stok = float(baris.get("jumlah_stok", 0) or 0)
+                biaya = float(baris.get("biaya_satuan", 0) or 0)
+                harga = float(baris.get("harga_jual", 0) or 0)
+                stok_minimum = float(baris.get("stok_minimum", 0) or 0)
 
-                self.product_repo.create(
+                self.repositori_produk.buat(
                     sku=sku,
-                    name=name,
-                    category=str(row.get("category", "")).strip() or None,
-                    supplier_id=supplier_id,
-                    unit=unit,
-                    stock_quantity=stock,
-                    unit_cost=cost,
-                    selling_price=price,
-                    minimum_stock=min_stock,
+                    nama=nama,
+                    kategori=str(baris.get("kategori", "")).strip() or None,
+                    id_pemasok=id_pemasok,
+                    satuan=satuan,
+                    jumlah_stok=stok,
+                    biaya_satuan=biaya,
+                    harga_jual=harga,
+                    stok_minimum=stok_minimum,
                 )
-                success_count += 1
-            except Exception as err:
-                fail_count += 1
-                errors.append(f"Baris {row_num}: {err}")
+                jumlah_berhasil += 1
+            except Exception as kesalahan:
+                jumlah_gagal += 1
+                daftar_kesalahan.append(f"Baris {nomor_baris}: {kesalahan}")
 
-        return success_count, fail_count, errors
+        return jumlah_berhasil, jumlah_gagal, daftar_kesalahan
 
-    def generate_sample_templates(self):
+    def buat_template_contoh(self):
         """Membuat template CSV di storage/imports/ menggunakan Pandas."""
-        prod_data = {
+        data_produk = {
             "sku": ["BRG-003", "BRG-004"],
-            "name": ["Susu Bubuk 500g", "Sirup Karamel 750ml"],
-            "category": ["Bahan Minuman", "Bahan Minuman"],
-            "supplier_code": ["SUP-001", "SUP-001"],
-            "unit": ["pcs", "botol"],
-            "stock_quantity": [50, 30],
-            "unit_cost": [25000, 45000],
-            "selling_price": [32000, 58000],
-            "minimum_stock": [10, 8],
+            "nama": ["Susu Bubuk 500g", "Sirup Karamel 750ml"],
+            "kategori": ["Bahan Minuman", "Bahan Minuman"],
+            "kode_pemasok": ["SUP-001", "SUP-001"],
+            "satuan": ["pcs", "botol"],
+            "jumlah_stok": [50, 30],
+            "biaya_satuan": [25000, 45000],
+            "harga_jual": [32000, 58000],
+            "stok_minimum": [10, 8],
         }
-        df_prod = pd.DataFrame(prod_data)
-        df_prod.to_csv(IMPORTS_DIR / "template_products.csv", index=False)
+        kerangka_produk = pd.DataFrame(data_produk)
+        kerangka_produk.to_csv(DIREKTORI_IMPOR / "template_products.csv", index=False)
 
-        sup_data = {
-            "supplier_code": ["SUP-002"],
-            "name": ["Distributor Bahan Baku Sejahtera"],
-            "contact_name": ["Budi Santoso"],
-            "phone": ["081234567890"],
-            "address": ["Bandung"],
+        data_pemasok = {
+            "kode_pemasok": ["SUP-002"],
+            "nama": ["Distributor Bahan Baku Sejahtera"],
+            "nama_kontak": ["Budi Santoso"],
+            "telepon": ["081234567890"],
+            "alamat": ["Bandung"],
         }
-        df_sup = pd.DataFrame(sup_data)
-        df_sup.to_csv(IMPORTS_DIR / "template_suppliers.csv", index=False)
+        kerangka_pemasok = pd.DataFrame(data_pemasok)
+        kerangka_pemasok.to_csv(DIREKTORI_IMPOR / "template_suppliers.csv", index=False)

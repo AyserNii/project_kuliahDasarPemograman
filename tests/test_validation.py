@@ -1,58 +1,58 @@
 import unittest
 from datetime import date
 from modules.validation import (
-    validate_positive_number,
-    validate_non_negative_number,
-    validate_non_empty_string,
-    validate_sku,
-    validate_transaction_type,
-    validate_date_string,
+    validasi_angka_positif,
+    validasi_angka_tidak_negatif,
+    validasi_teks_tidak_kosong,
+    validasi_sku,
+    validasi_jenis_transaksi,
+    validasi_teks_tanggal,
 )
 
 
 class TestValidation(unittest.TestCase):
     def test_validate_positive_number_valid(self):
-        self.assertEqual(validate_positive_number("12.5"), 12.5)
-        self.assertEqual(validate_positive_number(100), 100.0)
+        self.assertEqual(validasi_angka_positif("12.5"), 12.5)
+        self.assertEqual(validasi_angka_positif(100), 100.0)
 
     def test_validate_positive_number_invalid(self):
         with self.assertRaises(ValueError):
-            validate_positive_number(0)
+            validasi_angka_positif(0)
         with self.assertRaises(ValueError):
-            validate_positive_number(-5)
+            validasi_angka_positif(-5)
         with self.assertRaises(ValueError):
-            validate_positive_number("abc")
+            validasi_angka_positif("abc")
 
     def test_validate_non_negative_number(self):
-        self.assertEqual(validate_non_negative_number(0), 0.0)
-        self.assertEqual(validate_non_negative_number("15"), 15.0)
+        self.assertEqual(validasi_angka_tidak_negatif(0), 0.0)
+        self.assertEqual(validasi_angka_tidak_negatif("15"), 15.0)
         with self.assertRaises(ValueError):
-            validate_non_negative_number(-1)
+            validasi_angka_tidak_negatif(-1)
 
     def test_validate_non_empty_string(self):
-        self.assertEqual(validate_non_empty_string("  Kopi  "), "Kopi")
+        self.assertEqual(validasi_teks_tidak_kosong("  Kopi  "), "Kopi")
         with self.assertRaises(ValueError):
-            validate_non_empty_string("")
+            validasi_teks_tidak_kosong("")
         with self.assertRaises(ValueError):
-            validate_non_empty_string("   ")
+            validasi_teks_tidak_kosong("   ")
 
     def test_validate_sku(self):
-        self.assertEqual(validate_sku("brg-001"), "BRG-001")
+        self.assertEqual(validasi_sku("brg-001"), "BRG-001")
         with self.assertRaises(ValueError):
-            validate_sku("")
+            validasi_sku("")
         with self.assertRaises(ValueError):
-            validate_sku("A" * 45)
+            validasi_sku("A" * 45)
 
     def test_validate_transaction_type(self):
-        self.assertEqual(validate_transaction_type("in"), "IN")
-        self.assertEqual(validate_transaction_type("OUT"), "OUT")
+        self.assertEqual(validasi_jenis_transaksi("in"), "IN")
+        self.assertEqual(validasi_jenis_transaksi("OUT"), "OUT")
         with self.assertRaises(ValueError):
-            validate_transaction_type("TRANSFER")
+            validasi_jenis_transaksi("TRANSFER")
 
     def test_validate_date_string(self):
-        self.assertEqual(validate_date_string("2026-11-19"), date(2026, 11, 19))
+        self.assertEqual(validasi_teks_tanggal("2026-11-19"), date(2026, 11, 19))
         with self.assertRaises(ValueError):
-            validate_date_string("19/11/2026")
+            validasi_teks_tanggal("19/11/2026")
 
 
 if __name__ == "__main__":

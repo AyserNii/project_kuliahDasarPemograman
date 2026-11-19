@@ -3,120 +3,120 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 from psycopg.rows import dict_row
 
-from database.connection import get_connection
+from database.connection import buat_koneksi
 
 
-class AnalysisRepository:
+class RepositoriAnalisis:
     """Repository untuk operasi tabel inventory_analysis di database PostgreSQL."""
 
-    def __init__(self, connection=None):
-        self._connection = connection
+    def __init__(self, koneksi=None):
+        self._koneksi = koneksi
 
-    def _get_conn(self):
-        return self._connection if self._connection else get_connection()
+    def _ambil_koneksi(self):
+        return self._koneksi if self._koneksi else buat_koneksi()
 
-    def save(
+    def simpan(
         self,
-        product_id: int,
-        annual_demand: float,
-        ordering_cost: float,
-        holding_cost_per_unit_year: float,
-        average_daily_demand: float,
-        daily_demand_stddev: float,
-        lead_time_days: float,
-        z_score: float,
-        eoq: float,
-        safety_stock: float,
-        reorder_point: float,
-        analysis_date: Optional[date] = None,
+        id_produk: int,
+        permintaan_tahunan: float,
+        biaya_pemesanan: float,
+        biaya_penyimpanan_per_unit_tahun: float,
+        rata_rata_permintaan_harian: float,
+        simpangan_baku_permintaan_harian: float,
+        waktu_tunggu_hari: float,
+        skor_z: float,
+        kuantitas_pemesanan_ekonomis: float,
+        stok_pengaman: float,
+        titik_pemesanan_ulang: float,
+        tanggal_analisis: Optional[date] = None,
     ) -> Dict[str, Any]:
-        target_date = analysis_date or date.today()
+        tanggal_tujuan = tanggal_analisis or date.today()
 
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
                     """
                     INSERT INTO inventory_analysis (
-                        product_id, analysis_date, annual_demand, ordering_cost,
-                        holding_cost_per_unit_year, average_daily_demand,
-                        daily_demand_stddev, lead_time_days, z_score,
-                        eoq, safety_stock, reorder_point
+                        id_produk, tanggal_analisis, permintaan_tahunan, biaya_pemesanan,
+                        biaya_penyimpanan_per_unit_tahun, rata_rata_permintaan_harian,
+                        simpangan_baku_permintaan_harian, waktu_tunggu_hari, skor_z,
+                        kuantitas_pemesanan_ekonomis, stok_pengaman, titik_pemesanan_ulang
                     )
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (product_id, analysis_date) DO UPDATE SET
-                        annual_demand = EXCLUDED.annual_demand,
-                        ordering_cost = EXCLUDED.ordering_cost,
-                        holding_cost_per_unit_year = EXCLUDED.holding_cost_per_unit_year,
-                        average_daily_demand = EXCLUDED.average_daily_demand,
-                        daily_demand_stddev = EXCLUDED.daily_demand_stddev,
-                        lead_time_days = EXCLUDED.lead_time_days,
-                        z_score = EXCLUDED.z_score,
-                        eoq = EXCLUDED.eoq,
-                        safety_stock = EXCLUDED.safety_stock,
-                        reorder_point = EXCLUDED.reorder_point
+                    ON CONFLICT (id_produk, tanggal_analisis) DO UPDATE SET
+                        permintaan_tahunan = EXCLUDED.permintaan_tahunan,
+                        biaya_pemesanan = EXCLUDED.biaya_pemesanan,
+                        biaya_penyimpanan_per_unit_tahun = EXCLUDED.biaya_penyimpanan_per_unit_tahun,
+                        rata_rata_permintaan_harian = EXCLUDED.rata_rata_permintaan_harian,
+                        simpangan_baku_permintaan_harian = EXCLUDED.simpangan_baku_permintaan_harian,
+                        waktu_tunggu_hari = EXCLUDED.waktu_tunggu_hari,
+                        skor_z = EXCLUDED.skor_z,
+                        kuantitas_pemesanan_ekonomis = EXCLUDED.kuantitas_pemesanan_ekonomis,
+                        stok_pengaman = EXCLUDED.stok_pengaman,
+                        titik_pemesanan_ulang = EXCLUDED.titik_pemesanan_ulang
                     RETURNING *
                     """,
                     (
-                        product_id,
-                        target_date,
-                        Decimal(str(round(annual_demand, 2))),
-                        Decimal(str(round(ordering_cost, 2))),
-                        Decimal(str(round(holding_cost_per_unit_year, 2))),
-                        Decimal(str(round(average_daily_demand, 2))),
-                        Decimal(str(round(daily_demand_stddev, 2))),
-                        Decimal(str(round(lead_time_days, 2))),
-                        Decimal(str(round(z_score, 3))),
-                        Decimal(str(round(eoq, 2))),
-                        Decimal(str(round(safety_stock, 2))),
-                        Decimal(str(round(reorder_point, 2))),
+                        id_produk,
+                        tanggal_tujuan,
+                        Decimal(str(round(permintaan_tahunan, 2))),
+                        Decimal(str(round(biaya_pemesanan, 2))),
+                        Decimal(str(round(biaya_penyimpanan_per_unit_tahun, 2))),
+                        Decimal(str(round(rata_rata_permintaan_harian, 2))),
+                        Decimal(str(round(simpangan_baku_permintaan_harian, 2))),
+                        Decimal(str(round(waktu_tunggu_hari, 2))),
+                        Decimal(str(round(skor_z, 3))),
+                        Decimal(str(round(kuantitas_pemesanan_ekonomis, 2))),
+                        Decimal(str(round(stok_pengaman, 2))),
+                        Decimal(str(round(titik_pemesanan_ulang, 2))),
                     ),
                 )
-                result = cur.fetchone()
-                conn.commit()
-                return result
+                hasil = kursor.fetchone()
+                koneksi.commit()
+                return hasil
 
-    def get_latest_by_product(self, product_id: int) -> Optional[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
+    def ambil_terbaru_berdasarkan_produk(self, id_produk: int) -> Optional[Dict[str, Any]]:
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
                     """
-                    SELECT a.*, p.sku, p.name as product_name, p.stock_quantity, p.unit
+                    SELECT a.*, p.sku, p.nama as nama_produk, p.jumlah_stok, p.satuan
                     FROM inventory_analysis a
-                    JOIN products p ON a.product_id = p.product_id
-                    WHERE a.product_id = %s
-                    ORDER BY a.analysis_date DESC
+                    JOIN products p ON a.id_produk = p.id_produk
+                    WHERE a.id_produk = %s
+                    ORDER BY a.tanggal_analisis DESC
                     LIMIT 1
                     """,
-                    (product_id,),
+                    (id_produk,),
                 )
-                return cur.fetchone()
+                return kursor.fetchone()
 
-    def get_all_latest(self) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
+    def ambil_semua_terbaru(self) -> List[Dict[str, Any]]:
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
                     """
-                    SELECT DISTINCT ON (a.product_id)
-                        a.*, p.sku, p.name as product_name, p.stock_quantity, p.unit, p.unit_cost
+                    SELECT DISTINCT ON (a.id_produk)
+                        a.*, p.sku, p.nama as nama_produk, p.jumlah_stok, p.satuan, p.biaya_satuan
                     FROM inventory_analysis a
-                    JOIN products p ON a.product_id = p.product_id
-                    ORDER BY a.product_id, a.analysis_date DESC
+                    JOIN products p ON a.id_produk = p.id_produk
+                    ORDER BY a.id_produk, a.tanggal_analisis DESC
                     """
                 )
-                return cur.fetchall()
+                return kursor.fetchall()
 
-    def get_history_by_product(self, product_id: int, limit: int = 30) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
+    def ambil_riwayat_berdasarkan_produk(self, id_produk: int, batas: int = 30) -> List[Dict[str, Any]]:
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
                     """
-                    SELECT a.*, p.sku, p.name as product_name
+                    SELECT a.*, p.sku, p.nama as nama_produk
                     FROM inventory_analysis a
-                    JOIN products p ON a.product_id = p.product_id
-                    WHERE a.product_id = %s
-                    ORDER BY a.analysis_date DESC
+                    JOIN products p ON a.id_produk = p.id_produk
+                    WHERE a.id_produk = %s
+                    ORDER BY a.tanggal_analisis DESC
                     LIMIT %s
                     """,
-                    (product_id, limit),
+                    (id_produk, batas),
                 )
-                return cur.fetchall()
+                return kursor.fetchall()

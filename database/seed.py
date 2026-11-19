@@ -3,222 +3,222 @@ from decimal import Decimal
 from math import sqrt
 from pathlib import Path
 
-from database.connection import get_connection
+from database.connection import buat_koneksi
 
 
-SUPPLIERS = (
+DATA_PEMASOK = (
     ("SUP-001", "Sumber Pangan Nusantara", "Tim Penjualan", "021-555-0101", "Jakarta"),
 )
 
-PRODUCTS = (
+DATA_PRODUK = (
     ("BRG-001", "Kopi Arabika 250 g", "Minuman", "SUP-001", "pcs", "93", "45000", "60000", "20"),
     ("BRG-002", "Teh Melati 100 g", "Minuman", "SUP-001", "pcs", "75", "18000", "25000", "15"),
 )
 
-TRANSACTIONS = (
+DATA_TRANSAKSI = (
     ("SEED-IN-001", "BRG-001", "SUP-001", "IN", "100", "45000", 30, "Stok awal"),
     ("SEED-IN-002", "BRG-002", "SUP-001", "IN", "80", "18000", 30, "Stok awal"),
     ("SEED-SALE-001", "BRG-001", None, "OUT", "7", "45000", 3, "Penjualan contoh"),
     ("SEED-SALE-002", "BRG-002", None, "OUT", "5", "18000", 2, "Penjualan contoh"),
 )
 
-SALES = (
+DATA_PENJUALAN = (
     ("SEED-SALE-001", "BRG-001", "7", "60000", 3),
     ("SEED-SALE-002", "BRG-002", "5", "25000", 2),
 )
 
-ANALYSIS_INPUTS = (
+MASUKAN_ANALISIS = (
     ("BRG-001", "2400", "50000", "12000", "8", "2", "5", "1.650"),
     ("BRG-002", "1800", "75000", "18000", "6", "1.5", "7", "1.650"),
 )
 
 
-def _decimal(value):
-    return Decimal(str(value))
+def _ubah_ke_desimal(nilai):
+    return Decimal(str(nilai))
 
 
-def _analysis_results(
-    annual_demand,
-    ordering_cost,
-    holding_cost,
-    average_daily_demand,
-    daily_demand_stddev,
-    lead_time_days,
-    z_score,
+def _hitung_hasil_analisis(
+    permintaan_tahunan,
+    biaya_pemesanan,
+    biaya_penyimpanan,
+    rata_rata_permintaan_harian,
+    simpangan_baku_permintaan_harian,
+    waktu_tunggu_hari,
+    skor_z,
 ):
-    eoq = sqrt(
-        (2 * float(annual_demand) * float(ordering_cost)) / float(holding_cost)
+    kuantitas_pemesanan_ekonomis = sqrt(
+        (2 * float(permintaan_tahunan) * float(biaya_pemesanan)) / float(biaya_penyimpanan)
     )
-    safety_stock = (
-        float(z_score)
-        * float(daily_demand_stddev)
-        * sqrt(float(lead_time_days))
+    stok_pengaman = (
+        float(skor_z)
+        * float(simpangan_baku_permintaan_harian)
+        * sqrt(float(waktu_tunggu_hari))
     )
-    reorder_point = (
-        float(average_daily_demand) * float(lead_time_days) + safety_stock
+    titik_pemesanan_ulang = (
+        float(rata_rata_permintaan_harian) * float(waktu_tunggu_hari) + stok_pengaman
     )
     return (
-        _decimal(f"{eoq:.2f}"),
-        _decimal(f"{safety_stock:.2f}"),
-        _decimal(f"{reorder_point:.2f}"),
+        _ubah_ke_desimal(f"{kuantitas_pemesanan_ekonomis:.2f}"),
+        _ubah_ke_desimal(f"{stok_pengaman:.2f}"),
+        _ubah_ke_desimal(f"{titik_pemesanan_ulang:.2f}"),
     )
 
 
-def seed_database():
-    schema_sql = Path(__file__).with_name("schema.sql").read_text(encoding="utf-8")
-    supplier_ids = {}
-    product_ids = {}
+def siapkan_basis_data():
+    sql_skema = Path(__file__).with_name("schema.sql").read_text(encoding="utf-8")
+    id_pemasok_berdasarkan_kode = {}
+    id_produk_berdasarkan_sku = {}
 
-    with get_connection() as connection:
-        connection.execute(schema_sql)
+    with buat_koneksi() as koneksi:
+        koneksi.execute(sql_skema)
 
-        for code, name, contact, phone, address in SUPPLIERS:
-            row = connection.execute(
+        for kode, nama, kontak, telepon, alamat in DATA_PEMASOK:
+            baris = koneksi.execute(
                 """
-                INSERT INTO suppliers (supplier_code, name, contact_name, phone, address)
+                INSERT INTO suppliers (kode_pemasok, nama, nama_kontak, telepon, alamat)
                 VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT (supplier_code) DO UPDATE SET
-                    name = EXCLUDED.name,
-                    contact_name = EXCLUDED.contact_name,
-                    phone = EXCLUDED.phone,
-                    address = EXCLUDED.address
-                RETURNING supplier_id
+                ON CONFLICT (kode_pemasok) DO UPDATE SET
+                    nama = EXCLUDED.nama,
+                    nama_kontak = EXCLUDED.nama_kontak,
+                    telepon = EXCLUDED.telepon,
+                    alamat = EXCLUDED.alamat
+                RETURNING id_pemasok
                 """,
-                (code, name, contact, phone, address),
+                (kode, nama, kontak, telepon, alamat),
             ).fetchone()
-            supplier_ids[code] = row[0]
+            id_pemasok_berdasarkan_kode[kode] = baris[0]
 
         for (
             sku,
-            name,
-            category,
-            supplier_code,
-            unit,
-            stock,
-            unit_cost,
-            selling_price,
-            minimum_stock,
-        ) in PRODUCTS:
-            row = connection.execute(
+            nama,
+            kategori,
+            kode_pemasok,
+            satuan,
+            stok,
+            biaya_satuan,
+            harga_jual,
+            stok_minimum,
+        ) in DATA_PRODUK:
+            baris = koneksi.execute(
                 """
                 INSERT INTO products (
-                    sku, name, category, supplier_id, unit, stock_quantity,
-                    unit_cost, selling_price, minimum_stock
+                    sku, nama, kategori, id_pemasok, satuan, jumlah_stok,
+                    biaya_satuan, harga_jual, stok_minimum
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (sku) DO UPDATE SET
-                    name = EXCLUDED.name,
-                    category = EXCLUDED.category,
-                    supplier_id = EXCLUDED.supplier_id,
-                    unit = EXCLUDED.unit,
-                    stock_quantity = EXCLUDED.stock_quantity,
-                    unit_cost = EXCLUDED.unit_cost,
-                    selling_price = EXCLUDED.selling_price,
-                    minimum_stock = EXCLUDED.minimum_stock
-                RETURNING product_id
+                    nama = EXCLUDED.nama,
+                    kategori = EXCLUDED.kategori,
+                    id_pemasok = EXCLUDED.id_pemasok,
+                    satuan = EXCLUDED.satuan,
+                    jumlah_stok = EXCLUDED.jumlah_stok,
+                    biaya_satuan = EXCLUDED.biaya_satuan,
+                    harga_jual = EXCLUDED.harga_jual,
+                    stok_minimum = EXCLUDED.stok_minimum
+                RETURNING id_produk
                 """,
                 (
                     sku,
-                    name,
-                    category,
-                    supplier_ids[supplier_code],
-                    unit,
-                    _decimal(stock),
-                    _decimal(unit_cost),
-                    _decimal(selling_price),
-                    _decimal(minimum_stock),
+                    nama,
+                    kategori,
+                    id_pemasok_berdasarkan_kode[kode_pemasok],
+                    satuan,
+                    _ubah_ke_desimal(stok),
+                    _ubah_ke_desimal(biaya_satuan),
+                    _ubah_ke_desimal(harga_jual),
+                    _ubah_ke_desimal(stok_minimum),
                 ),
             ).fetchone()
-            product_ids[sku] = row[0]
+            id_produk_berdasarkan_sku[sku] = baris[0]
 
-        for code, sku, supplier_code, kind, quantity, unit_cost, days_ago, notes in TRANSACTIONS:
-            connection.execute(
+        for kode, sku, kode_pemasok, jenis, kuantitas, biaya_satuan, hari_lalu, catatan in DATA_TRANSAKSI:
+            koneksi.execute(
                 """
                 INSERT INTO transactions (
-                    transaction_code, product_id, supplier_id, transaction_type,
-                    quantity, unit_cost, transaction_date, notes
+                    kode_transaksi, id_produk, id_pemasok, jenis_transaksi,
+                    kuantitas, biaya_satuan, tanggal_transaksi, catatan
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (transaction_code) DO UPDATE SET
-                    product_id = EXCLUDED.product_id,
-                    supplier_id = EXCLUDED.supplier_id,
-                    transaction_type = EXCLUDED.transaction_type,
-                    quantity = EXCLUDED.quantity,
-                    unit_cost = EXCLUDED.unit_cost,
-                    notes = EXCLUDED.notes
+                ON CONFLICT (kode_transaksi) DO UPDATE SET
+                    id_produk = EXCLUDED.id_produk,
+                    id_pemasok = EXCLUDED.id_pemasok,
+                    jenis_transaksi = EXCLUDED.jenis_transaksi,
+                    kuantitas = EXCLUDED.kuantitas,
+                    biaya_satuan = EXCLUDED.biaya_satuan,
+                    catatan = EXCLUDED.catatan
                 """,
                 (
-                    code,
-                    product_ids[sku],
-                    supplier_ids.get(supplier_code),
-                    kind,
-                    _decimal(quantity),
-                    _decimal(unit_cost),
-                    datetime.now(timezone.utc) - timedelta(days=days_ago),
-                    notes,
+                    kode,
+                    id_produk_berdasarkan_sku[sku],
+                    id_pemasok_berdasarkan_kode.get(kode_pemasok),
+                    jenis,
+                    _ubah_ke_desimal(kuantitas),
+                    _ubah_ke_desimal(biaya_satuan),
+                    datetime.now(timezone.utc) - timedelta(days=hari_lalu),
+                    catatan,
                 ),
             )
 
-        for code, sku, quantity, unit_price, days_ago in SALES:
-            transaction_id = connection.execute(
-                "SELECT transaction_id FROM transactions WHERE transaction_code = %s",
-                (code,),
+        for kode, sku, kuantitas, harga_satuan, hari_lalu in DATA_PENJUALAN:
+            id_transaksi = koneksi.execute(
+                "SELECT id_transaksi FROM transactions WHERE kode_transaksi = %s",
+                (kode,),
             ).fetchone()[0]
-            connection.execute(
+            koneksi.execute(
                 """
                 INSERT INTO sales_history (
-                    transaction_id, product_id, quantity_sold, unit_price, sale_date
+                    id_transaksi, id_produk, kuantitas_terjual, harga_satuan, tanggal_penjualan
                 )
                 VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT (transaction_id) DO UPDATE SET
-                    product_id = EXCLUDED.product_id,
-                    quantity_sold = EXCLUDED.quantity_sold,
-                    unit_price = EXCLUDED.unit_price
+                ON CONFLICT (id_transaksi) DO UPDATE SET
+                    id_produk = EXCLUDED.id_produk,
+                    kuantitas_terjual = EXCLUDED.kuantitas_terjual,
+                    harga_satuan = EXCLUDED.harga_satuan
                 """,
                 (
-                    transaction_id,
-                    product_ids[sku],
-                    _decimal(quantity),
-                    _decimal(unit_price),
-                    datetime.now(timezone.utc) - timedelta(days=days_ago),
+                    id_transaksi,
+                    id_produk_berdasarkan_sku[sku],
+                    _ubah_ke_desimal(kuantitas),
+                    _ubah_ke_desimal(harga_satuan),
+                    datetime.now(timezone.utc) - timedelta(days=hari_lalu),
                 ),
             )
 
-        for sku, *raw_inputs in ANALYSIS_INPUTS:
-            inputs = tuple(_decimal(value) for value in raw_inputs)
-            eoq, safety_stock, reorder_point = _analysis_results(*inputs)
-            connection.execute(
+        for sku, *masukan_mentah in MASUKAN_ANALISIS:
+            masukan = tuple(_ubah_ke_desimal(nilai) for nilai in masukan_mentah)
+            kuantitas_pemesanan_ekonomis, stok_pengaman, titik_pemesanan_ulang = _hitung_hasil_analisis(*masukan)
+            koneksi.execute(
                 """
                 INSERT INTO inventory_analysis (
-                    product_id, analysis_date, annual_demand, ordering_cost,
-                    holding_cost_per_unit_year, average_daily_demand,
-                    daily_demand_stddev, lead_time_days, z_score, eoq,
-                    safety_stock, reorder_point
+                    id_produk, tanggal_analisis, permintaan_tahunan, biaya_pemesanan,
+                    biaya_penyimpanan_per_unit_tahun, rata_rata_permintaan_harian,
+                    simpangan_baku_permintaan_harian, waktu_tunggu_hari, skor_z, kuantitas_pemesanan_ekonomis,
+                    stok_pengaman, titik_pemesanan_ulang
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (product_id, analysis_date) DO UPDATE SET
-                    annual_demand = EXCLUDED.annual_demand,
-                    ordering_cost = EXCLUDED.ordering_cost,
-                    holding_cost_per_unit_year = EXCLUDED.holding_cost_per_unit_year,
-                    average_daily_demand = EXCLUDED.average_daily_demand,
-                    daily_demand_stddev = EXCLUDED.daily_demand_stddev,
-                    lead_time_days = EXCLUDED.lead_time_days,
-                    z_score = EXCLUDED.z_score,
-                    eoq = EXCLUDED.eoq,
-                    safety_stock = EXCLUDED.safety_stock,
-                    reorder_point = EXCLUDED.reorder_point
+                ON CONFLICT (id_produk, tanggal_analisis) DO UPDATE SET
+                    permintaan_tahunan = EXCLUDED.permintaan_tahunan,
+                    biaya_pemesanan = EXCLUDED.biaya_pemesanan,
+                    biaya_penyimpanan_per_unit_tahun = EXCLUDED.biaya_penyimpanan_per_unit_tahun,
+                    rata_rata_permintaan_harian = EXCLUDED.rata_rata_permintaan_harian,
+                    simpangan_baku_permintaan_harian = EXCLUDED.simpangan_baku_permintaan_harian,
+                    waktu_tunggu_hari = EXCLUDED.waktu_tunggu_hari,
+                    skor_z = EXCLUDED.skor_z,
+                    kuantitas_pemesanan_ekonomis = EXCLUDED.kuantitas_pemesanan_ekonomis,
+                    stok_pengaman = EXCLUDED.stok_pengaman,
+                    titik_pemesanan_ulang = EXCLUDED.titik_pemesanan_ulang
                 """,
                 (
-                    product_ids[sku],
+                    id_produk_berdasarkan_sku[sku],
                     date.today(),
-                    *inputs,
-                    eoq,
-                    safety_stock,
-                    reorder_point,
+                    *masukan,
+                    kuantitas_pemesanan_ekonomis,
+                    stok_pengaman,
+                    titik_pemesanan_ulang,
                 ),
             )
 
 
 if __name__ == "__main__":
-    seed_database()
+    siapkan_basis_data()
     print("Skema database dan data contoh berhasil disiapkan.")

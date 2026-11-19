@@ -1,2 +1,2 @@
-sku,name,category,supplier_code,unit,stock_quantity,unit_cost,selling_price,minimum_stock
+sku,nama,kategori,kode_pemasok,satuan,jumlah_stok,biaya_satuan,harga_jual,stok_minimum
 BRG-003,Susu Bubuk 500g,Bahan Minuman,SUP-001,pcs,50,25000,32000,10

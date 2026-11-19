@@ -1,13 +1,13 @@
-from repositories.product_repository import ProductRepository
-from repositories.supplier_repository import SupplierRepository
-from repositories.transaction_repository import TransactionRepository
-from repositories.sales_repository import SalesRepository
-from repositories.analysis_repository import AnalysisRepository
+from repositories.product_repository import RepositoriProduk
+from repositories.supplier_repository import RepositoriPemasok
+from repositories.transaction_repository import RepositoriTransaksi
+from repositories.sales_repository import RepositoriPenjualan
+from repositories.analysis_repository import RepositoriAnalisis
 
 __all__ = [
-    "ProductRepository",
-    "SupplierRepository",
-    "TransactionRepository",
-    "SalesRepository",
-    "AnalysisRepository",
+    "RepositoriProduk",
+    "RepositoriPemasok",
+    "RepositoriTransaksi",
+    "RepositoriPenjualan",
+    "RepositoriAnalisis",
 ]

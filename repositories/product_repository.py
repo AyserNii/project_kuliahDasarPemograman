@@ -2,173 +2,173 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 from psycopg.rows import dict_row
 
-from database.connection import get_connection
+from database.connection import buat_koneksi
 
 
-class ProductRepository:
+class RepositoriProduk:
     """Repository untuk operasi tabel products di database PostgreSQL."""
 
-    def __init__(self, connection=None):
-        self._connection = connection
+    def __init__(self, koneksi=None):
+        self._koneksi = koneksi
 
-    def _get_conn(self):
-        return self._connection if self._connection else get_connection()
+    def _ambil_koneksi(self):
+        return self._koneksi if self._koneksi else buat_koneksi()
 
-    def get_all(self) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
+    def ambil_semua(self) -> List[Dict[str, Any]]:
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
                     """
-                    SELECT p.*, s.name as supplier_name, s.supplier_code
+                    SELECT p.*, s.nama as nama_pemasok, s.kode_pemasok
                     FROM products p
-                    LEFT JOIN suppliers s ON p.supplier_id = s.supplier_id
-                    ORDER BY p.product_id ASC
+                    LEFT JOIN suppliers s ON p.id_pemasok = s.id_pemasok
+                    ORDER BY p.id_produk ASC
                     """
                 )
-                return cur.fetchall()
+                return kursor.fetchall()
 
-    def get_by_id(self, product_id: int) -> Optional[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
+    def ambil_berdasarkan_id(self, id_produk: int) -> Optional[Dict[str, Any]]:
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
                     """
-                    SELECT p.*, s.name as supplier_name, s.supplier_code
+                    SELECT p.*, s.nama as nama_pemasok, s.kode_pemasok
                     FROM products p
-                    LEFT JOIN suppliers s ON p.supplier_id = s.supplier_id
-                    WHERE p.product_id = %s
+                    LEFT JOIN suppliers s ON p.id_pemasok = s.id_pemasok
+                    WHERE p.id_produk = %s
                     """,
-                    (product_id,),
+                    (id_produk,),
                 )
-                return cur.fetchone()
+                return kursor.fetchone()
 
-    def get_by_sku(self, sku: str) -> Optional[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
+    def ambil_berdasarkan_sku(self, sku: str) -> Optional[Dict[str, Any]]:
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
                     """
-                    SELECT p.*, s.name as supplier_name, s.supplier_code
+                    SELECT p.*, s.nama as nama_pemasok, s.kode_pemasok
                     FROM products p
-                    LEFT JOIN suppliers s ON p.supplier_id = s.supplier_id
+                    LEFT JOIN suppliers s ON p.id_pemasok = s.id_pemasok
                     WHERE p.sku = %s
                     """,
                     (sku,),
                 )
-                return cur.fetchone()
+                return kursor.fetchone()
 
-    def create(
+    def buat(
         self,
         sku: str,
-        name: str,
-        category: Optional[str] = None,
-        supplier_id: Optional[int] = None,
-        unit: str = "pcs",
-        stock_quantity: float = 0,
-        unit_cost: float = 0,
-        selling_price: float = 0,
-        minimum_stock: float = 0,
+        nama: str,
+        kategori: Optional[str] = None,
+        id_pemasok: Optional[int] = None,
+        satuan: str = "pcs",
+        jumlah_stok: float = 0,
+        biaya_satuan: float = 0,
+        harga_jual: float = 0,
+        stok_minimum: float = 0,
     ) -> Dict[str, Any]:
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
                     """
                     INSERT INTO products (
-                        sku, name, category, supplier_id, unit,
-                        stock_quantity, unit_cost, selling_price, minimum_stock
+                        sku, nama, kategori, id_pemasok, satuan,
+                        jumlah_stok, biaya_satuan, harga_jual, stok_minimum
                     )
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING *
                     """,
                     (
                         sku,
-                        name,
-                        category,
-                        supplier_id,
-                        unit,
-                        Decimal(str(stock_quantity)),
-                        Decimal(str(unit_cost)),
-                        Decimal(str(selling_price)),
-                        Decimal(str(minimum_stock)),
+                        nama,
+                        kategori,
+                        id_pemasok,
+                        satuan,
+                        Decimal(str(jumlah_stok)),
+                        Decimal(str(biaya_satuan)),
+                        Decimal(str(harga_jual)),
+                        Decimal(str(stok_minimum)),
                     ),
                 )
-                result = cur.fetchone()
-                conn.commit()
-                return result
+                hasil = kursor.fetchone()
+                koneksi.commit()
+                return hasil
 
-    def update(
+    def perbarui(
         self,
-        product_id: int,
-        name: str,
-        category: Optional[str] = None,
-        supplier_id: Optional[int] = None,
-        unit: str = "pcs",
-        unit_cost: float = 0,
-        selling_price: float = 0,
-        minimum_stock: float = 0,
+        id_produk: int,
+        nama: str,
+        kategori: Optional[str] = None,
+        id_pemasok: Optional[int] = None,
+        satuan: str = "pcs",
+        biaya_satuan: float = 0,
+        harga_jual: float = 0,
+        stok_minimum: float = 0,
     ) -> Optional[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
                     """
                     UPDATE products
-                    SET name = %s,
-                        category = %s,
-                        supplier_id = %s,
-                        unit = %s,
-                        unit_cost = %s,
-                        selling_price = %s,
-                        minimum_stock = %s
-                    WHERE product_id = %s
+                    SET nama = %s,
+                        kategori = %s,
+                        id_pemasok = %s,
+                        satuan = %s,
+                        biaya_satuan = %s,
+                        harga_jual = %s,
+                        stok_minimum = %s
+                    WHERE id_produk = %s
                     RETURNING *
                     """,
                     (
-                        name,
-                        category,
-                        supplier_id,
-                        unit,
-                        Decimal(str(unit_cost)),
-                        Decimal(str(selling_price)),
-                        Decimal(str(minimum_stock)),
-                        product_id,
+                        nama,
+                        kategori,
+                        id_pemasok,
+                        satuan,
+                        Decimal(str(biaya_satuan)),
+                        Decimal(str(harga_jual)),
+                        Decimal(str(stok_minimum)),
+                        id_produk,
                     ),
                 )
-                result = cur.fetchone()
-                conn.commit()
-                return result
+                hasil = kursor.fetchone()
+                koneksi.commit()
+                return hasil
 
-    def update_stock(self, product_id: int, quantity_change: float) -> Optional[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
+    def perbarui_stok(self, id_produk: int, perubahan_kuantitas: float) -> Optional[Dict[str, Any]]:
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
                     """
                     UPDATE products
-                    SET stock_quantity = stock_quantity + %s
-                    WHERE product_id = %s
+                    SET jumlah_stok = jumlah_stok + %s
+                    WHERE id_produk = %s
                     RETURNING *
                     """,
-                    (Decimal(str(quantity_change)), product_id),
+                    (Decimal(str(perubahan_kuantitas)), id_produk),
                 )
-                result = cur.fetchone()
-                conn.commit()
-                return result
+                hasil = kursor.fetchone()
+                koneksi.commit()
+                return hasil
 
-    def delete(self, product_id: int) -> bool:
-        with self._get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute("DELETE FROM products WHERE product_id = %s", (product_id,))
-                deleted = cur.rowcount > 0
-                conn.commit()
-                return deleted
+    def hapus(self, id_produk: int) -> bool:
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor() as kursor:
+                kursor.execute("DELETE FROM products WHERE id_produk = %s", (id_produk,))
+                terhapus = kursor.rowcount > 0
+                koneksi.commit()
+                return terhapus
 
-    def get_low_stock(self) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
+    def ambil_stok_menipis(self) -> List[Dict[str, Any]]:
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
                     """
-                    SELECT p.*, s.name as supplier_name, s.supplier_code
+                    SELECT p.*, s.nama as nama_pemasok, s.kode_pemasok
                     FROM products p
-                    LEFT JOIN suppliers s ON p.supplier_id = s.supplier_id
-                    WHERE p.stock_quantity <= p.minimum_stock
-                    ORDER BY p.stock_quantity ASC
+                    LEFT JOIN suppliers s ON p.id_pemasok = s.id_pemasok
+                    WHERE p.jumlah_stok <= p.stok_minimum
+                    ORDER BY p.jumlah_stok ASC
                     """
                 )
-                return cur.fetchall()
+                return kursor.fetchall()

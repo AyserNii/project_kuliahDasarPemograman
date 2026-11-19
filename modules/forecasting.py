@@ -1,100 +1,105 @@
-import math
 import statistics
 from typing import Dict, List, Optional
 import pandas as pd
 
 
-def moving_average(data: List[float], window_size: int = 3) -> float:
+def rata_rata_bergerak(data: List[float], ukuran_jendela: int = 3) -> float:
     """
     Menghitung Moving Average untuk peramalan permintaan periode berikutnya.
     """
     if not data:
         return 0.0
-    if window_size <= 0:
-        raise ValueError("Ukuran window harus lebih besar dari 0")
+    if ukuran_jendela <= 0:
+        raise ValueError("Ukuran jendela harus lebih besar dari 0")
 
-    window = [float(x) for x in data[-window_size:]]
-    return round(sum(window) / len(window), 2)
+    jendela = [float(nilai) for nilai in data[-ukuran_jendela:]]
+    return round(sum(jendela) / len(jendela), 2)
 
 
-def pandas_rolling_forecast(data: List[float], window_size: int = 3) -> List[Optional[float]]:
+def peramalan_rata_rata_bergerak_pandas(data: List[float], ukuran_jendela: int = 3) -> List[Optional[float]]:
     """
     Menghitung deret Moving Average secara menyeluruh menggunakan Pandas Series.
     (Materi Penggunaan Pandas DataFrame/Series untuk Analisis Data)
     """
     if not data:
         return []
-    s = pd.Series([float(x) for x in data])
-    rolling = s.rolling(window=window_size).mean()
-    return [round(val, 2) if not pd.isna(val) else None for val in rolling]
+    elemen = pd.Series([float(nilai) for nilai in data])
+    hasil_bergulir = elemen.rolling(window=ukuran_jendela).mean()
+    return [
+        round(nilai, 2) if not pd.isna(nilai) else None
+        for nilai in hasil_bergulir
+    ]
 
 
-def weighted_moving_average(data: List[float], weights: Optional[List[float]] = None) -> float:
+def rata_rata_bergerak_tertimbang(data: List[float], bobot: Optional[List[float]] = None) -> float:
     """
     Menghitung Weighted Moving Average (WMA).
-    Bobot default adalah bertingkat dari 1 s.d. n.
+    Bobot nilai_default adalah bertingkat dari 1 s.d. n.
     """
     if not data:
         return 0.0
 
-    n = len(data)
-    if weights is None:
-        weights = list(range(1, n + 1))
+    jumlah = len(data)
+    if bobot is None:
+        bobot = list(range(1, jumlah + 1))
 
-    if len(weights) != n:
+    if len(bobot) != jumlah:
         raise ValueError("Jumlah bobot harus sama dengan jumlah data")
 
-    total_weight = sum(weights)
-    if total_weight == 0:
+    total_bobot = sum(bobot)
+    if total_bobot == 0:
         raise ValueError("Total bobot tidak boleh 0")
 
-    weighted_sum = sum(float(d) * float(w) for d, w in zip(data, weights))
-    return round(weighted_sum / total_weight, 2)
+    jumlah_tertimbang = sum(
+        float(nilai) * float(bobot_data)
+        for nilai, bobot_data in zip(data, bobot)
+    )
+    return round(jumlah_tertimbang / total_bobot, 2)
 
 
-def exponential_smoothing(data: List[float], alpha: float = 0.3) -> float:
+def pemulusan_eksponensial(data: List[float], alfa: float = 0.3) -> float:
     """
     Menghitung Single Exponential Smoothing (SES).
-    - alpha: faktor pembobotan (0 < alpha <= 1)
+    - alfa: faktor pembobotan (0 < alfa <= 1)
     """
     if not data:
         return 0.0
-    if not (0 < alpha <= 1):
-        raise ValueError("Alpha harus berada di antara 0 dan 1 (0 < alpha <= 1)")
+    if not (0 < alfa <= 1):
+        raise ValueError("Alpha harus berada di antara 0 dan 1 (0 < alfa <= 1)")
 
-    forecast = float(data[0])
-    for actual in data[1:]:
-        forecast = (alpha * float(actual)) + ((1 - alpha) * forecast)
+    peramalan = float(data[0])
+    for nilai_aktual in data[1:]:
+        peramalan = (alfa * float(nilai_aktual)) + ((1 - alfa) * peramalan)
 
-    return round(forecast, 2)
+    return round(peramalan, 2)
 
 
-def calculate_demand_statistics(daily_quantities: List[float]) -> Dict[str, float]:
+def hitung_statistik_permintaan(kuantitas_harian: List[float]) -> Dict[str, float]:
     """
     Menghitung metrik permintaan dari data kuantitas harian:
-    - Rata-rata permintaan harian (average_daily_demand)
-    - Standar deviasi harian (daily_demand_stddev)
-    - Estimasi permintaan tahunan (annual_demand)
+    - Rata-rata permintaan harian (rata_rata_permintaan_harian)
+    - Standar deviasi harian (simpangan_baku_permintaan_harian)
+    - Estimasi permintaan tahunan (permintaan_tahunan)
     """
-    if not daily_quantities:
+    if not kuantitas_harian:
         return {
-            "average_daily_demand": 0.0,
-            "daily_demand_stddev": 0.0,
-            "annual_demand": 0.0,
+            "rata_rata_permintaan_harian": 0.0,
+            "simpangan_baku_permintaan_harian": 0.0,
+            "permintaan_tahunan": 0.0,
         }
 
-    floats = [float(x) for x in daily_quantities]
-    avg = sum(floats) / len(floats)
+    daftar_angka = [float(nilai) for nilai in kuantitas_harian]
+    rata_rata = sum(daftar_angka) / len(daftar_angka)
 
-    if len(floats) > 1:
-        stddev = statistics.stdev(floats)
+    if len(daftar_angka) > 1:
+        simpangan_baku = statistics.stdev(daftar_angka)
     else:
-        stddev = 0.0
+        simpangan_baku = 0.0
 
-    annual = avg * 365.0
+    tahunan = rata_rata * 365.0
 
     return {
-        "average_daily_demand": round(avg, 2),
-        "daily_demand_stddev": round(stddev, 2),
-        "annual_demand": round(annual, 2),
+        "rata_rata_permintaan_harian": round(rata_rata, 2),
+        "simpangan_baku_permintaan_harian": round(simpangan_baku, 2),
+        "permintaan_tahunan": round(tahunan, 2),
     }

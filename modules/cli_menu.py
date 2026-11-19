@@ -1,84 +1,80 @@
-import sys
 from datetime import datetime
-from pathlib import Path
 
-from config.settings import IMPORTS_DIR
-from modules.analysis import determine_stock_status
-from modules.forecasting import calculate_demand_statistics, exponential_smoothing, moving_average
+from config.settings import DIREKTORI_IMPOR
+from modules.analysis import tentukan_status_stok
+from modules.forecasting import hitung_statistik_permintaan, pemulusan_eksponensial, rata_rata_bergerak
 from modules.report import (
-    ascii_bar_chart,
-    format_table,
-    generate_inventory_summary_report,
-    generate_stock_chart,
-    save_text_report,
+    grafik_batang_ascii,
+    format_tabel,
+    buat_laporan_ringkasan_persediaan,
+    buat_grafik_stok,
+    simpan_laporan_teks,
 )
 from modules.validation import (
-    validate_non_empty_string,
-    validate_non_negative_number,
-    validate_positive_number,
-    validate_sku,
+    validasi_teks_tidak_kosong,
+    validasi_sku,
 )
-from repositories.analysis_repository import AnalysisRepository
-from repositories.product_repository import ProductRepository
-from repositories.sales_repository import SalesRepository
-from repositories.supplier_repository import SupplierRepository
-from repositories.transaction_repository import TransactionRepository
-from services.export_service import ExportService
-from services.import_service import ImportService
-from services.inventory_service import InventoryService
+from repositories.analysis_repository import RepositoriAnalisis
+from repositories.product_repository import RepositoriProduk
+from repositories.sales_repository import RepositoriPenjualan
+from repositories.supplier_repository import RepositoriPemasok
+from repositories.transaction_repository import RepositoriTransaksi
+from services.export_service import LayananEkspor
+from services.import_service import LayananImpor
+from services.inventory_service import LayananPersediaan
 
 
-def print_header(title: str):
+def cetak_judul(judul: str):
     print("\n" + "=" * 60)
-    print(f"  {title.center(56)}")
+    print(f"  {judul.center(56)}")
     print("=" * 60)
 
 
-def prompt_string(prompt: str, default: str = "") -> str:
-    val = input(f"{prompt} [{default}]: " if default else f"{prompt}: ").strip()
-    return val if val else default
+def minta_teks(perintah: str, nilai_default: str = "") -> str:
+    nilai = input(f"{perintah} [{nilai_default}]: " if nilai_default else f"{perintah}: ").strip()
+    return nilai if nilai else nilai_default
 
 
-def prompt_float(prompt: str, default: float = 0.0, allow_zero: bool = True) -> float:
+def minta_angka(perintah: str, nilai_default: float = 0.0, izinkan_nol: bool = True) -> float:
     while True:
-        raw = input(f"{prompt} [{default}]: ").strip()
-        if not raw:
-            return float(default)
+        masukan_mentah = input(f"{perintah} [{nilai_default}]: ").strip()
+        if not masukan_mentah:
+            return float(nilai_default)
         try:
-            val = float(raw)
-            if not allow_zero and val <= 0:
+            nilai = float(masukan_mentah)
+            if not izinkan_nol and nilai <= 0:
                 print("Nilai harus lebih besar dari 0.")
                 continue
-            if val < 0:
+            if nilai < 0:
                 print("Nilai tidak boleh negatif.")
                 continue
-            return val
+            return nilai
         except ValueError:
             print("Masukkan angka yang valid.")
 
 
-class SmartStockCLI:
+class AntarmukaSmartStockCLI:
     def __init__(self):
-        self.product_repo = ProductRepository()
-        self.supplier_repo = SupplierRepository()
-        self.transaction_repo = TransactionRepository()
-        self.sales_repo = SalesRepository()
-        self.analysis_repo = AnalysisRepository()
+        self.repositori_produk = RepositoriProduk()
+        self.repositori_pemasok = RepositoriPemasok()
+        self.repositori_transaksi = RepositoriTransaksi()
+        self.repositori_penjualan = RepositoriPenjualan()
+        self.repositori_analisis = RepositoriAnalisis()
 
-        self.import_service = ImportService(self.product_repo, self.supplier_repo)
-        self.export_service = ExportService(
-            self.product_repo,
-            self.transaction_repo,
-            self.sales_repo,
-            self.analysis_repo,
+        self.layanan_impor = LayananImpor(self.repositori_produk, self.repositori_pemasok)
+        self.layanan_ekspor = LayananEkspor(
+            self.repositori_produk,
+            self.repositori_transaksi,
+            self.repositori_penjualan,
+            self.repositori_analisis,
         )
-        self.inventory_service = InventoryService(
-            self.product_repo,
-            self.sales_repo,
-            self.analysis_repo,
+        self.layanan_persediaan = LayananPersediaan(
+            self.repositori_produk,
+            self.repositori_penjualan,
+            self.repositori_analisis,
         )
 
-    def run(self):
+    def jalankan(self):
         while True:
             print("\n" + "=" * 60)
             print("         SMARTSTOCK CLI - SISTEM MANAJEMEN INVENTARIS")
@@ -94,623 +90,623 @@ class SmartStockCLI:
             print("0. Keluar")
             print("-" * 60)
 
-            choice = input("Pilih menu [0-8]: ").strip()
+            pilihan = input("Pilih menu [0-8]: ").strip()
 
-            if choice == "0":
+            if pilihan == "0":
                 print("\nTerima kasih telah menggunakan SmartStock CLI.")
                 break
-            elif choice == "1":
-                self.menu_products()
-            elif choice == "2":
-                self.menu_suppliers()
-            elif choice == "3":
-                self.menu_transactions()
-            elif choice == "4":
-                self.menu_sales()
-            elif choice == "5":
-                self.menu_analysis()
-            elif choice == "6":
-                self.menu_forecasting()
-            elif choice == "7":
-                self.menu_reports()
-            elif choice == "8":
-                self.menu_import_export()
+            elif pilihan == "1":
+                self.menu_produk()
+            elif pilihan == "2":
+                self.menu_pemasok()
+            elif pilihan == "3":
+                self.menu_transaksi()
+            elif pilihan == "4":
+                self.menu_penjualan()
+            elif pilihan == "5":
+                self.menu_analisis()
+            elif pilihan == "6":
+                self.menu_peramalan()
+            elif pilihan == "7":
+                self.menu_laporan()
+            elif pilihan == "8":
+                self.menu_impor_ekspor()
             else:
                 print("Pilihan tidak valid. Silakan pilih 0-8.")
 
     # ==================== 1. PRODUK ====================
-    def menu_products(self):
+    def menu_produk(self):
         while True:
-            print_header("MANAJEMEN DATA PRODUK")
+            cetak_judul("MANAJEMEN DATA PRODUK")
             print("1. Lihat Semua Produk")
             print("2. Tambah Produk Baru")
             print("3. Perbarui Data Produk")
             print("4. Hapus Produk")
             print("0. Kembali ke Menu Utama")
 
-            ch = input("Pilihan: ").strip()
-            if ch == "0":
+            pilihan = input("Pilihan: ").strip()
+            if pilihan == "0":
                 break
-            elif ch == "1":
-                self.list_products()
-            elif ch == "2":
-                self.add_product()
-            elif ch == "3":
-                self.update_product()
-            elif ch == "4":
-                self.delete_product()
+            elif pilihan == "1":
+                self.tampilkan_produk()
+            elif pilihan == "2":
+                self.tambah_produk()
+            elif pilihan == "3":
+                self.perbarui_produk()
+            elif pilihan == "4":
+                self.hapus_produk()
 
-    def list_products(self):
-        products = self.product_repo.get_all()
-        if not products:
+    def tampilkan_produk(self):
+        daftar_produk = self.repositori_produk.ambil_semua()
+        if not daftar_produk:
             print("\nBelum ada produk yang terdaftar di database.")
             return
 
-        headers = ["ID", "SKU", "Nama Produk", "Kategori", "Stok", "Satuan", "Harga Modal", "Harga Jual", "Min. Stok"]
-        rows = []
-        for p in products:
-            rows.append([
-                p["product_id"],
-                p["sku"],
-                p["name"][:22],
-                p.get("category") or "-",
-                f"{float(p['stock_quantity']):.2f}",
-                p.get("unit", "pcs"),
-                f"Rp {float(p['unit_cost']):,.0f}",
-                f"Rp {float(p['selling_price']):,.0f}",
-                f"{float(p['minimum_stock']):.2f}",
+        judul_kolom = ["ID", "SKU", "Nama Produk", "Kategori", "Stok", "Satuan", "Harga Modal", "Harga Jual", "Min. Stok"]
+        baris_data = []
+        for produk in daftar_produk:
+            baris_data.append([
+                produk["id_produk"],
+                produk["sku"],
+                produk["nama"][:22],
+                produk.get("kategori") or "-",
+                f"{float(produk['jumlah_stok']):.2f}",
+                produk.get("satuan", "pcs"),
+                f"Rp {float(produk['biaya_satuan']):,.0f}",
+                f"Rp {float(produk['harga_jual']):,.0f}",
+                f"{float(produk['stok_minimum']):.2f}",
             ])
-        print("\n" + format_table(headers, rows))
+        print("\n" + format_tabel(judul_kolom, baris_data))
 
-    def add_product(self):
-        print_header("TAMBAH PRODUK BARU")
+    def tambah_produk(self):
+        cetak_judul("TAMBAH PRODUK BARU")
         try:
-            sku = validate_sku(input("Masukkan SKU (contoh: BRG-003): "))
-            if self.product_repo.get_by_sku(sku):
+            sku = validasi_sku(input("Masukkan SKU (contoh: BRG-003): "))
+            if self.repositori_produk.ambil_berdasarkan_sku(sku):
                 print(f"[Error] Produk dengan SKU '{sku}' sudah ada.")
                 return
 
-            name = validate_non_empty_string(input("Nama Produk: "), "Nama Produk")
-            category = prompt_string("Kategori (opsional)")
-            unit = prompt_string("Satuan", "pcs")
+            nama = validasi_teks_tidak_kosong(input("Nama Produk: "), "Nama Produk")
+            kategori = minta_teks("Kategori (opsional)")
+            satuan = minta_teks("Satuan", "pcs")
 
             # Tampilkan supplier yang tersedia
-            suppliers = self.supplier_repo.get_all()
-            supplier_id = None
-            if suppliers:
+            daftar_pemasok = self.repositori_pemasok.ambil_semua()
+            id_pemasok = None
+            if daftar_pemasok:
                 print("\nDaftar Supplier:")
-                for s in suppliers:
-                    print(f"  [{s['supplier_id']}] {s['supplier_code']} - {s['name']}")
-                sup_input = input("Pilih ID Supplier (kosongkan jika tanpa supplier): ").strip()
-                if sup_input.isdigit():
-                    supplier_id = int(sup_input)
+                for elemen in daftar_pemasok:
+                    print(f"  [{elemen['id_pemasok']}] {elemen['kode_pemasok']} - {elemen['nama']}")
+                masukan_pemasok = input("Pilih ID Supplier (kosongkan jika tanpa pemasok): ").strip()
+                if masukan_pemasok.isdigit():
+                    id_pemasok = int(masukan_pemasok)
 
-            initial_stock = prompt_float("Stok Awal", 0.0)
-            unit_cost = prompt_float("Harga Modal/Beli per Unit (Rp)", 0.0)
-            selling_price = prompt_float("Harga Jual per Unit (Rp)", 0.0)
-            min_stock = prompt_float("Batas Minimum Stok", 5.0)
+            stok_awal = minta_angka("Stok Awal", 0.0)
+            biaya_satuan = minta_angka("Harga Modal/Beli per Unit (Rp)", 0.0)
+            harga_jual = minta_angka("Harga Jual per Unit (Rp)", 0.0)
+            stok_minimum = minta_angka("Batas Minimum Stok", 5.0)
 
-            prod = self.product_repo.create(
+            produk = self.repositori_produk.buat(
                 sku=sku,
-                name=name,
-                category=category or None,
-                supplier_id=supplier_id,
-                unit=unit,
-                stock_quantity=initial_stock,
-                unit_cost=unit_cost,
-                selling_price=selling_price,
-                minimum_stock=min_stock,
+                nama=nama,
+                kategori=kategori or None,
+                id_pemasok=id_pemasok,
+                satuan=satuan,
+                jumlah_stok=stok_awal,
+                biaya_satuan=biaya_satuan,
+                harga_jual=harga_jual,
+                stok_minimum=stok_minimum,
             )
-            print(f"\n[SUKSES] Produk '{prod['name']}' (SKU: {prod['sku']}) berhasil disimpan ke database!")
-        except Exception as err:
-            print(f"\n[Gagal] {err}")
+            print(f"\n[SUKSES] Produk '{produk['nama']}' (SKU: {produk['sku']}) berhasil disimpan ke database!")
+        except Exception as kesalahan:
+            print(f"\n[Gagal] {kesalahan}")
 
-    def update_product(self):
-        print_header("PERBARUI DATA PRODUK")
-        self.list_products()
-        prod_id_str = input("\nMasukkan ID Produk yang ingin diubah: ").strip()
-        if not prod_id_str.isdigit():
+    def perbarui_produk(self):
+        cetak_judul("PERBARUI DATA PRODUK")
+        self.tampilkan_produk()
+        teks_id_produk = input("\nMasukkan ID Produk yang ingin diubah: ").strip()
+        if not teks_id_produk.isdigit():
             print("ID produk tidak valid.")
             return
 
-        prod = self.product_repo.get_by_id(int(prod_id_str))
-        if not prod:
+        produk = self.repositori_produk.ambil_berdasarkan_id(int(teks_id_produk))
+        if not produk:
             print("Produk tidak ditemukan.")
             return
 
-        print(f"\nMengedit Produk: {prod['name']} (SKU: {prod['sku']})")
-        name = prompt_string("Nama Produk", prod["name"])
-        category = prompt_string("Kategori", prod.get("category") or "")
-        unit = prompt_string("Satuan", prod.get("unit") or "pcs")
-        unit_cost = prompt_float("Harga Modal per Unit", float(prod["unit_cost"]))
-        selling_price = prompt_float("Harga Jual per Unit", float(prod["selling_price"]))
-        min_stock = prompt_float("Batas Minimum Stok", float(prod["minimum_stock"]))
+        print(f"\nMengedit Produk: {produk['nama']} (SKU: {produk['sku']})")
+        nama = minta_teks("Nama Produk", produk["nama"])
+        kategori = minta_teks("Kategori", produk.get("kategori") or "")
+        satuan = minta_teks("Satuan", produk.get("satuan") or "pcs")
+        biaya_satuan = minta_angka("Harga Modal per Unit", float(produk["biaya_satuan"]))
+        harga_jual = minta_angka("Harga Jual per Unit", float(produk["harga_jual"]))
+        stok_minimum = minta_angka("Batas Minimum Stok", float(produk["stok_minimum"]))
 
         try:
-            self.product_repo.update(
-                product_id=prod["product_id"],
-                name=name,
-                category=category or None,
-                supplier_id=prod.get("supplier_id"),
-                unit=unit,
-                unit_cost=unit_cost,
-                selling_price=selling_price,
-                minimum_stock=min_stock,
+            self.repositori_produk.perbarui(
+                id_produk=produk["id_produk"],
+                nama=nama,
+                kategori=kategori or None,
+                id_pemasok=produk.get("id_pemasok"),
+                satuan=satuan,
+                biaya_satuan=biaya_satuan,
+                harga_jual=harga_jual,
+                stok_minimum=stok_minimum,
             )
             print("\n[SUKSES] Data produk berhasil diperbarui.")
-        except Exception as err:
-            print(f"\n[Gagal] {err}")
+        except Exception as kesalahan:
+            print(f"\n[Gagal] {kesalahan}")
 
-    def delete_product(self):
-        print_header("HAPUS PRODUK")
-        prod_id_str = input("Masukkan ID Produk yang ingin dihapus: ").strip()
-        if not prod_id_str.isdigit():
+    def hapus_produk(self):
+        cetak_judul("HAPUS PRODUK")
+        teks_id_produk = input("Masukkan ID Produk yang ingin dihapus: ").strip()
+        if not teks_id_produk.isdigit():
             print("ID produk tidak valid.")
             return
 
-        prod = self.product_repo.get_by_id(int(prod_id_str))
-        if not prod:
+        produk = self.repositori_produk.ambil_berdasarkan_id(int(teks_id_produk))
+        if not produk:
             print("Produk tidak ditemukan.")
             return
 
-        confirm = input(f"Yakin ingin menghapus produk '{prod['name']}'? (y/n): ").strip().lower()
-        if confirm == "y":
+        konfirmasi = input(f"Yakin ingin menghapus produk '{produk['nama']}'? (y/n): ").strip().lower()
+        if konfirmasi == "y":
             try:
-                success = self.product_repo.delete(int(prod_id_str))
-                if success:
+                berhasil = self.repositori_produk.hapus(int(teks_id_produk))
+                if berhasil:
                     print("\n[SUKSES] Produk berhasil dihapus.")
                 else:
                     print("\n[Gagal] Produk tidak dapat dihapus.")
-            except Exception as err:
-                print(f"\n[Gagal] Tidak dapat menghapus produk: {err}")
+            except Exception as kesalahan:
+                print(f"\n[Gagal] Tidak dapat menghapus produk: {kesalahan}")
 
     # ==================== 2. SUPPLIER ====================
-    def menu_suppliers(self):
+    def menu_pemasok(self):
         while True:
-            print_header("MANAJEMEN DATA SUPPLIER")
+            cetak_judul("MANAJEMEN DATA SUPPLIER")
             print("1. Lihat Semua Supplier")
             print("2. Tambah Supplier Baru")
             print("0. Kembali ke Menu Utama")
 
-            ch = input("Pilihan: ").strip()
-            if ch == "0":
+            pilihan = input("Pilihan: ").strip()
+            if pilihan == "0":
                 break
-            elif ch == "1":
-                self.list_suppliers()
-            elif ch == "2":
-                self.add_supplier()
+            elif pilihan == "1":
+                self.tampilkan_pemasok()
+            elif pilihan == "2":
+                self.tambah_pemasok()
 
-    def list_suppliers(self):
-        suppliers = self.supplier_repo.get_all()
-        if not suppliers:
-            print("\nBelum ada data supplier di database.")
+    def tampilkan_pemasok(self):
+        daftar_pemasok = self.repositori_pemasok.ambil_semua()
+        if not daftar_pemasok:
+            print("\nBelum ada data pemasok di database.")
             return
 
-        headers = ["ID", "Kode Supplier", "Nama Supplier", "Kontak Person", "No. Telepon", "Alamat"]
-        rows = [
+        judul_kolom = ["ID", "Kode Supplier", "Nama Supplier", "Kontak Person", "No. Telepon", "Alamat"]
+        baris_data = [
             [
-                s["supplier_id"],
-                s["supplier_code"],
-                s["name"],
-                s.get("contact_name") or "-",
-                s.get("phone") or "-",
-                (s.get("address") or "-")[:25],
+                elemen["id_pemasok"],
+                elemen["kode_pemasok"],
+                elemen["nama"],
+                elemen.get("nama_kontak") or "-",
+                elemen.get("telepon") or "-",
+                (elemen.get("alamat") or "-")[:25],
             ]
-            for s in suppliers
+            for elemen in daftar_pemasok
         ]
-        print("\n" + format_table(headers, rows))
+        print("\n" + format_tabel(judul_kolom, baris_data))
 
-    def add_supplier(self):
-        print_header("TAMBAH SUPPLIER BARU")
+    def tambah_pemasok(self):
+        cetak_judul("TAMBAH SUPPLIER BARU")
         try:
-            code = validate_non_empty_string(input("Kode Supplier (contoh: SUP-002): "), "Kode").upper()
-            if self.supplier_repo.get_by_code(code):
-                print(f"[Error] Supplier dengan kode '{code}' sudah ada.")
+            kode = validasi_teks_tidak_kosong(input("Kode Supplier (contoh: SUP-002): "), "Kode").upper()
+            if self.repositori_pemasok.ambil_berdasarkan_kode(kode):
+                print(f"[Error] Supplier dengan kode '{kode}' sudah ada.")
                 return
 
-            name = validate_non_empty_string(input("Nama Perusahaan/Pemasok: "), "Nama Supplier")
-            contact = prompt_string("Nama Kontak")
-            phone = prompt_string("Nomor Telepon")
-            address = prompt_string("Alamat")
+            nama = validasi_teks_tidak_kosong(input("Nama Perusahaan/Pemasok: "), "Nama Supplier")
+            kontak = minta_teks("Nama Kontak")
+            telepon = minta_teks("Nomor Telepon")
+            alamat = minta_teks("Alamat")
 
-            sup = self.supplier_repo.create(
-                supplier_code=code,
-                name=name,
-                contact_name=contact or None,
-                phone=phone or None,
-                address=address or None,
+            pemasok = self.repositori_pemasok.buat(
+                kode_pemasok=kode,
+                nama=nama,
+                nama_kontak=kontak or None,
+                telepon=telepon or None,
+                alamat=alamat or None,
             )
-            print(f"\n[SUKSES] Supplier '{sup['name']}' berhasil disimpan ke database!")
-        except Exception as err:
-            print(f"\n[Gagal] {err}")
+            print(f"\n[SUKSES] Supplier '{pemasok['nama']}' berhasil disimpan ke database!")
+        except Exception as kesalahan:
+            print(f"\n[Gagal] {kesalahan}")
 
     # ==================== 3. TRANSAKSI ====================
-    def menu_transactions(self):
+    def menu_transaksi(self):
         while True:
-            print_header("MANAJEMEN TRANSAKSI PERSEDIAAN")
+            cetak_judul("MANAJEMEN TRANSAKSI PERSEDIAAN")
             print("1. Lihat Riwayat Transaksi")
             print("2. Catat Stok Masuk (IN)")
             print("3. Catat Stok Keluar / Penyesuaian (OUT)")
             print("0. Kembali ke Menu Utama")
 
-            ch = input("Pilihan: ").strip()
-            if ch == "0":
+            pilihan = input("Pilihan: ").strip()
+            if pilihan == "0":
                 break
-            elif ch == "1":
-                self.list_transactions()
-            elif ch == "2":
-                self.record_inventory_movement("IN")
-            elif ch == "3":
-                self.record_inventory_movement("OUT")
+            elif pilihan == "1":
+                self.tampilkan_transaksi()
+            elif pilihan == "2":
+                self.catat_pergerakan_persediaan("IN")
+            elif pilihan == "3":
+                self.catat_pergerakan_persediaan("OUT")
 
-    def list_transactions(self):
-        txns = self.transaction_repo.get_all(limit=50)
-        if not txns:
+    def tampilkan_transaksi(self):
+        daftar_transaksi = self.repositori_transaksi.ambil_semua(batas=50)
+        if not daftar_transaksi:
             print("\nBelum ada riwayat transaksi.")
             return
 
-        headers = ["Kode Transaksi", "Waktu", "SKU", "Nama Produk", "Tipe", "Jumlah", "Biaya Satuan", "Catatan"]
-        rows = []
-        for t in txns:
-            dt_str = t["transaction_date"].strftime("%Y-%m-%d %H:%M") if t.get("transaction_date") else "-"
-            rows.append([
-                t["transaction_code"],
-                dt_str,
-                t["sku"],
-                t["product_name"][:20],
-                t["transaction_type"],
-                f"{float(t['quantity']):.2f}",
-                f"Rp {float(t['unit_cost']):,.0f}",
-                (t.get("notes") or "-")[:20],
+        judul_kolom = ["Kode Transaksi", "Waktu", "SKU", "Nama Produk", "Tipe", "Jumlah", "Biaya Satuan", "Catatan"]
+        baris_data = []
+        for transaksi in daftar_transaksi:
+            teks_waktu = transaksi["tanggal_transaksi"].strftime("%Y-%m-%d %H:%M") if transaksi.get("tanggal_transaksi") else "-"
+            baris_data.append([
+                transaksi["kode_transaksi"],
+                teks_waktu,
+                transaksi["sku"],
+                transaksi["nama_produk"][:20],
+                transaksi["jenis_transaksi"],
+                f"{float(transaksi['kuantitas']):.2f}",
+                f"Rp {float(transaksi['biaya_satuan']):,.0f}",
+                (transaksi.get("catatan") or "-")[:20],
             ])
-        print("\n" + format_table(headers, rows))
+        print("\n" + format_tabel(judul_kolom, baris_data))
 
-    def record_inventory_movement(self, t_type: str):
-        label = "STOK MASUK (IN)" if t_type == "IN" else "STOK KELUAR (OUT)"
-        print_header(f"CATAT {label}")
+    def catat_pergerakan_persediaan(self, jenis_pergerakan: str):
+        label = "STOK MASUK (IN)" if jenis_pergerakan == "IN" else "STOK KELUAR (OUT)"
+        cetak_judul(f"CATAT {label}")
 
-        self.list_products()
-        prod_id_str = input("\nMasukkan ID Produk: ").strip()
-        if not prod_id_str.isdigit():
+        self.tampilkan_produk()
+        teks_id_produk = input("\nMasukkan ID Produk: ").strip()
+        if not teks_id_produk.isdigit():
             print("ID produk tidak valid.")
             return
 
-        prod = self.product_repo.get_by_id(int(prod_id_str))
-        if not prod:
+        produk = self.repositori_produk.ambil_berdasarkan_id(int(teks_id_produk))
+        if not produk:
             print("Produk tidak ditemukan.")
             return
 
-        qty = prompt_float(f"Jumlah Kuantitas {t_type}", 1.0, allow_zero=False)
-        unit_cost = prompt_float("Biaya per unit (Rp)", float(prod["unit_cost"]))
-        notes = prompt_string("Catatan Transaksi", f"Transaksi {t_type}")
+        kuantitas = minta_angka(f"Jumlah Kuantitas {jenis_pergerakan}", 1.0, izinkan_nol=False)
+        biaya_satuan = minta_angka("Biaya per satuan (Rp)", float(produk["biaya_satuan"]))
+        catatan = minta_teks("Catatan Transaksi", f"Transaksi {jenis_pergerakan}")
 
         # Kode transaksi unik
-        timestamp_code = datetime.now().strftime("%Y%m%d%H%M%S")
-        txn_code = f"TXN-{t_type}-{timestamp_code}"
+        kode_cap_waktu = datetime.now().strftime("%Y%m%d%H%M%S")
+        kode_transaksi = f"TXN-{jenis_pergerakan}-{kode_cap_waktu}"
 
         try:
-            txn = self.transaction_repo.create(
-                transaction_code=txn_code,
-                product_id=prod["product_id"],
-                transaction_type=t_type,
-                quantity=qty,
-                unit_cost=unit_cost,
-                supplier_id=prod.get("supplier_id") if t_type == "IN" else None,
-                notes=notes,
+            transaksi = self.repositori_transaksi.buat(
+                kode_transaksi=kode_transaksi,
+                id_produk=produk["id_produk"],
+                jenis_transaksi=jenis_pergerakan,
+                kuantitas=kuantitas,
+                biaya_satuan=biaya_satuan,
+                id_pemasok=produk.get("id_pemasok") if jenis_pergerakan == "IN" else None,
+                catatan=catatan,
             )
-            updated_prod = self.product_repo.get_by_id(prod["product_id"])
-            print(f"\n[SUKSES] Transaksi {txn['transaction_code']} berhasil dicatat!")
-            print(f"Stok terbaru untuk '{updated_prod['name']}': {float(updated_prod['stock_quantity']):.2f} {updated_prod.get('unit', 'pcs')}")
-        except Exception as err:
-            print(f"\n[Gagal] {err}")
+            produk_diperbarui = self.repositori_produk.ambil_berdasarkan_id(produk["id_produk"])
+            print(f"\n[SUKSES] Transaksi {transaksi['kode_transaksi']} berhasil dicatat!")
+            print(f"Stok terbaru untuk '{produk_diperbarui['nama']}': {float(produk_diperbarui['jumlah_stok']):.2f} {produk_diperbarui.get('satuan', 'pcs')}")
+        except Exception as kesalahan:
+            print(f"\n[Gagal] {kesalahan}")
 
     # ==================== 4. PENJUALAN ====================
-    def menu_sales(self):
+    def menu_penjualan(self):
         while True:
-            print_header("MANAJEMEN RIWAYAT PENJUALAN")
+            cetak_judul("MANAJEMEN RIWAYAT PENJUALAN")
             print("1. Lihat Riwayat Penjualan")
             print("2. Catat Penjualan Baru")
             print("0. Kembali ke Menu Utama")
 
-            ch = input("Pilihan: ").strip()
-            if ch == "0":
+            pilihan = input("Pilihan: ").strip()
+            if pilihan == "0":
                 break
-            elif ch == "1":
-                self.list_sales()
-            elif ch == "2":
-                self.record_new_sale()
+            elif pilihan == "1":
+                self.tampilkan_penjualan()
+            elif pilihan == "2":
+                self.catat_penjualan_baru()
 
-    def list_sales(self):
-        sales = self.sales_repo.get_all(limit=50)
-        if not sales:
+    def tampilkan_penjualan(self):
+        daftar_penjualan = self.repositori_penjualan.ambil_semua(batas=50)
+        if not daftar_penjualan:
             print("\nBelum ada riwayat penjualan di database.")
             return
 
-        headers = ["ID Sales", "Kode Transaksi", "Waktu Penjualan", "SKU", "Produk", "Qty Terjual", "Harga Jual", "Total"]
-        rows = []
-        for s in sales:
-            qty = float(s["quantity_sold"])
-            price = float(s["unit_price"])
-            dt_str = s["sale_date"].strftime("%Y-%m-%d %H:%M") if s.get("sale_date") else "-"
-            rows.append([
-                s["sales_id"],
-                s["transaction_code"],
-                dt_str,
-                s["sku"],
-                s["product_name"][:20],
-                f"{qty:.2f}",
-                f"Rp {price:,.0f}",
-                f"Rp {qty * price:,.0f}",
+        judul_kolom = ["ID Sales", "Kode Transaksi", "Waktu Penjualan", "SKU", "Produk", "Qty Terjual", "Harga Jual", "Total"]
+        baris_data = []
+        for elemen in daftar_penjualan:
+            kuantitas = float(elemen["kuantitas_terjual"])
+            harga = float(elemen["harga_satuan"])
+            teks_waktu = elemen["tanggal_penjualan"].strftime("%Y-%m-%d %H:%M") if elemen.get("tanggal_penjualan") else "-"
+            baris_data.append([
+                elemen["id_penjualan"],
+                elemen["kode_transaksi"],
+                teks_waktu,
+                elemen["sku"],
+                elemen["nama_produk"][:20],
+                f"{kuantitas:.2f}",
+                f"Rp {harga:,.0f}",
+                f"Rp {kuantitas * harga:,.0f}",
             ])
-        print("\n" + format_table(headers, rows))
+        print("\n" + format_tabel(judul_kolom, baris_data))
 
-    def record_new_sale(self):
-        print_header("CATAT PENJUALAN BARU")
-        self.list_products()
-        prod_id_str = input("\nMasukkan ID Produk yang Terjual: ").strip()
-        if not prod_id_str.isdigit():
+    def catat_penjualan_baru(self):
+        cetak_judul("CATAT PENJUALAN BARU")
+        self.tampilkan_produk()
+        teks_id_produk = input("\nMasukkan ID Produk yang Terjual: ").strip()
+        if not teks_id_produk.isdigit():
             print("ID produk tidak valid.")
             return
 
-        prod = self.product_repo.get_by_id(int(prod_id_str))
-        if not prod:
+        produk = self.repositori_produk.ambil_berdasarkan_id(int(teks_id_produk))
+        if not produk:
             print("Produk tidak ditemukan.")
             return
 
-        curr_stock = float(prod["stock_quantity"])
-        print(f"Produk: {prod['name']} | Stok Tersedia: {curr_stock:.2f} {prod.get('unit', 'pcs')}")
+        stok_saat_ini = float(produk["jumlah_stok"])
+        print(f"Produk: {produk['nama']} | Stok Tersedia: {stok_saat_ini:.2f} {produk.get('satuan', 'pcs')}")
 
-        qty = prompt_float("Kuantitas Terjual", 1.0, allow_zero=False)
-        selling_price = prompt_float("Harga Jual per Unit (Rp)", float(prod["selling_price"]))
-        notes = prompt_string("Catatan Penjualan (opsional)", "Penjualan Pelanggan")
+        kuantitas = minta_angka("Kuantitas Terjual", 1.0, izinkan_nol=False)
+        harga_jual = minta_angka("Harga Jual per Unit (Rp)", float(produk["harga_jual"]))
+        catatan = minta_teks("Catatan Penjualan (opsional)", "Penjualan Pelanggan")
 
         try:
-            sale = self.sales_repo.record_sale(
-                product_id=prod["product_id"],
-                quantity_sold=qty,
-                unit_price=selling_price,
-                notes=notes,
+            penjualan = self.repositori_penjualan.catat_penjualan(
+                id_produk=produk["id_produk"],
+                kuantitas_terjual=kuantitas,
+                harga_satuan=harga_jual,
+                catatan=catatan,
             )
-            updated_prod = self.product_repo.get_by_id(prod["product_id"])
-            total_rev = qty * selling_price
-            print(f"\n[SUKSES] Penjualan berhasil dicatat! Total Penjualan: Rp {total_rev:,.0f}")
-            print(f"Sisa Stok '{updated_prod['name']}': {float(updated_prod['stock_quantity']):.2f}")
-        except Exception as err:
-            print(f"\n[Gagal] {err}")
+            produk_diperbarui = self.repositori_produk.ambil_berdasarkan_id(produk["id_produk"])
+            total_pendapatan = kuantitas * harga_jual
+            print(f"\n[SUKSES] Penjualan berhasil dicatat! Total Penjualan: Rp {total_pendapatan:,.0f}")
+            print(f"Sisa Stok '{produk_diperbarui['nama']}': {float(produk_diperbarui['jumlah_stok']):.2f}")
+        except Exception as kesalahan:
+            print(f"\n[Gagal] {kesalahan}")
 
     # ==================== 5. ANALISIS PERSEDIAAN ====================
-    def menu_analysis(self):
+    def menu_analisis(self):
         while True:
-            print_header("OPTIMASI PERSEDIAAN (EOQ, SAFETY STOCK & ROP)")
+            cetak_judul("OPTIMASI PERSEDIAAN (EOQ, SAFETY STOCK & ROP)")
             print("1. Hitung & Simpan Analisis untuk Satu Produk")
             print("2. Jalankan Analisis Otomatis untuk Seluruh Produk")
             print("3. Lihat Hasil Analisis & Rekomendasi Terakhir")
             print("0. Kembali ke Menu Utama")
 
-            ch = input("Pilihan: ").strip()
-            if ch == "0":
+            pilihan = input("Pilihan: ").strip()
+            if pilihan == "0":
                 break
-            elif ch == "1":
-                self.run_single_product_analysis()
-            elif ch == "2":
-                self.run_batch_analysis()
-            elif ch == "3":
-                self.show_latest_analysis()
+            elif pilihan == "1":
+                self.jalankan_analisis_satu_produk()
+            elif pilihan == "2":
+                self.jalankan_analisis_massal()
+            elif pilihan == "3":
+                self.tampilkan_analisis_terbaru()
 
-    def run_single_product_analysis(self):
-        print_header("ANALISIS PERSEDIAAN PRODUK")
-        self.list_products()
-        prod_id_str = input("\nMasukkan ID Produk untuk dianalisis: ").strip()
-        if not prod_id_str.isdigit():
+    def jalankan_analisis_satu_produk(self):
+        cetak_judul("ANALISIS PERSEDIAAN PRODUK")
+        self.tampilkan_produk()
+        teks_id_produk = input("\nMasukkan ID Produk untuk dianalisis: ").strip()
+        if not teks_id_produk.isdigit():
             print("ID produk tidak valid.")
             return
 
-        prod = self.product_repo.get_by_id(int(prod_id_str))
-        if not prod:
+        produk = self.repositori_produk.ambil_berdasarkan_id(int(teks_id_produk))
+        if not produk:
             print("Produk tidak ditemukan.")
             return
 
-        print(f"\nParameter Optimasi untuk: {prod['name']}")
-        s_cost = prompt_float("Biaya Pemesanan per Order (Rp) [S]", 50000.0)
-        lead_time = prompt_float("Waktu Tunggu Pengiriman/Lead Time (hari) [L]", 5.0)
-        h_rate = prompt_float("Tarif Biaya Simpan per Tahun (% dari harga barang)", 20.0) / 100.0
-        z_val = prompt_float("Z-score Tingkat Pelayanan (1.65 = ~95% service level)", 1.65)
-        manual_demand = prompt_float("Permintaan Tahunan (D) - Kosongkan/0 untuk hitung otomatis dari penjualan", 0.0)
+        print(f"\nParameter Optimasi untuk: {produk['nama']}")
+        biaya_pemesanan = minta_angka("Biaya Pemesanan per Order (Rp) [S]", 50000.0)
+        waktu_tunggu = minta_angka("Waktu Tunggu Pengiriman/Lead Time (hari) [L]", 5.0)
+        rasio_biaya_simpan = minta_angka("Tarif Biaya Simpan per Tahun (% dari harga barang)", 20.0) / 100.0
+        nilai_z = minta_angka("Z-score Tingkat Pelayanan (1.65 = ~95% service level)", 1.65)
+        permintaan_manual = minta_angka("Permintaan Tahunan (D) - Kosongkan/0 untuk hitung otomatis dari penjualan", 0.0)
 
         try:
-            res = self.inventory_service.analyze_product(
-                product_id=prod["product_id"],
-                ordering_cost=s_cost,
-                holding_cost_rate=h_rate,
-                lead_time_days=lead_time,
-                z_score=z_val,
-                manual_annual_demand=manual_demand if manual_demand > 0 else None,
+            hasil = self.layanan_persediaan.analisis_produk(
+                id_produk=produk["id_produk"],
+                biaya_pemesanan=biaya_pemesanan,
+                rasio_biaya_penyimpanan=rasio_biaya_simpan,
+                waktu_tunggu_hari=waktu_tunggu,
+                skor_z=nilai_z,
+                permintaan_tahunan_manual=permintaan_manual if permintaan_manual > 0 else None,
             )
 
-            a = res["analysis"]
-            rec = res["recommendation"]
-            costs = res["costs"]
+            entri = hasil["analisis"]
+            rekomendasi = hasil["rekomendasi"]
+            biaya = hasil["biaya"]
 
             print("\n" + "=" * 60)
             print("                 HASIL PERHITUNGAN INVENTORY")
             print("=" * 60)
-            print(f"Produk                    : {prod['name']} (SKU: {prod['sku']})")
-            print(f"Permintaan Tahunan (D)    : {float(a['annual_demand']):,.2f} unit/tahun")
-            print(f"Biaya Pesan (S)           : Rp {float(a['ordering_cost']):,.2f}")
-            print(f"Biaya Simpan/Unit/Thn (H) : Rp {float(a['holding_cost_per_unit_year']):,.2f}")
+            print(f"Produk                    : {produk['nama']} (SKU: {produk['sku']})")
+            print(f"Permintaan Tahunan (D)    : {float(entri['permintaan_tahunan']):,.2f} unit/tahun")
+            print(f"Biaya Pesan (S)           : Rp {float(entri['biaya_pemesanan']):,.2f}")
+            print(f"Biaya Simpan/Unit/Thn (H) : Rp {float(entri['biaya_penyimpanan_per_unit_tahun']):,.2f}")
             print("-" * 60)
-            print(f"1. Economic Order Qty (EOQ): {float(a['eoq']):,.2f} unit (Jumlah pesan optimal)")
-            print(f"2. Safety Stock (SS)      : {float(a['safety_stock']):,.2f} unit (Persediaan pengaman)")
-            print(f"3. Reorder Point (ROP)     : {float(a['reorder_point']):,.2f} unit (Titik order kembali)")
+            print(f"1. Economic Order Qty (EOQ): {float(entri['kuantitas_pemesanan_ekonomis']):,.2f} unit (Jumlah pesan optimal)")
+            print(f"2. Safety Stock (SS)      : {float(entri['stok_pengaman']):,.2f} unit (Persediaan pengaman)")
+            print(f"3. Reorder Point (ROP)     : {float(entri['titik_pemesanan_ulang']):,.2f} unit (Titik order kembali)")
             print("-" * 60)
-            print(f"Frekuensi Pemesanan/Tahun  : {costs['number_of_orders_per_year']} kali/tahun")
-            print(f"Siklus Pemesanan           : Setiap ~{costs['order_cycle_days']} hari")
-            print(f"Total Biaya Persediaan/Thn : Rp {costs['total_cost']:,.2f}")
+            print(f"Frekuensi Pemesanan/Tahun  : {biaya['jumlah_pemesanan_per_tahun']} kali/tahun")
+            print(f"Siklus Pemesanan           : Setiap ~{biaya['hari_siklus_pemesanan']} hari")
+            print(f"Total Biaya Persediaan/Thn : Rp {biaya['total_biaya']:,.2f}")
             print("-" * 60)
-            print(f"STATUS STOK SAAT INI      : [{rec['status']}] (Stok Fisik: {rec['current_stock']:.2f})")
-            print(f"REKOMENDASI SISTEM        : {rec['action']}")
+            print(f"STATUS STOK SAAT INI      : [{rekomendasi['status']}] (Stok Fisik: {rekomendasi['stok_saat_ini']:.2f})")
+            print(f"REKOMENDASI SISTEM        : {rekomendasi['tindakan']}")
             print("=" * 60)
             print("[Info] Hasil analisis berhasil disimpan ke tabel inventory_analysis.")
-        except Exception as err:
-            print(f"\n[Gagal] {err}")
+        except Exception as kesalahan:
+            print(f"\n[Gagal] {kesalahan}")
 
-    def run_batch_analysis(self):
+    def jalankan_analisis_massal(self):
         print("\nMenjalankan analisis otomatis untuk seluruh produk...")
-        results = self.inventory_service.analyze_all_products()
-        success_count = sum(1 for r in results if "error" not in r)
-        print(f"\n[SUKSES] Selesai menganalisis {success_count} dari {len(results)} produk.")
-        self.show_latest_analysis()
+        daftar_hasil = self.layanan_persediaan.analisis_semua_produk()
+        jumlah_berhasil = sum(1 for hasil in daftar_hasil if "kesalahan" not in hasil)
+        print(f"\n[SUKSES] Selesai menganalisis {jumlah_berhasil} dari {len(daftar_hasil)} produk.")
+        self.tampilkan_analisis_terbaru()
 
-    def show_latest_analysis(self):
-        analyses = self.analysis_repo.get_all_latest()
-        if not analyses:
+    def tampilkan_analisis_terbaru(self):
+        daftar_analisis = self.repositori_analisis.ambil_semua_terbaru()
+        if not daftar_analisis:
             print("\nBelum ada riwayat hasil analisis di database.")
             return
 
-        headers = ["SKU", "Nama Produk", "Stok", "EOQ", "Safety Stock", "Reorder Point", "Status", "Tgl Analisis"]
-        rows = []
-        for a in analyses:
-            stock = float(a["stock_quantity"])
-            rop = float(a["reorder_point"])
-            ss = float(a["safety_stock"])
-            status = determine_stock_status(stock, rop, ss)
-            dt_str = str(a.get("analysis_date", "-"))
-            rows.append([
-                a["sku"],
-                a["product_name"][:20],
-                f"{stock:.1f}",
-                f"{float(a['eoq']):.1f}",
-                f"{ss:.1f}",
-                f"{rop:.1f}",
+        judul_kolom = ["SKU", "Nama Produk", "Stok", "EOQ", "Safety Stock", "Reorder Point", "Status", "Tgl Analisis"]
+        baris_data = []
+        for entri in daftar_analisis:
+            stok = float(entri["jumlah_stok"])
+            titik_pemesanan_ulang = float(entri["titik_pemesanan_ulang"])
+            stok_pengaman = float(entri["stok_pengaman"])
+            status = tentukan_status_stok(stok, titik_pemesanan_ulang, stok_pengaman)
+            teks_waktu = str(entri.get("tanggal_analisis", "-"))
+            baris_data.append([
+                entri["sku"],
+                entri["nama_produk"][:20],
+                f"{stok:.1f}",
+                f"{float(entri['kuantitas_pemesanan_ekonomis']):.1f}",
+                f"{stok_pengaman:.1f}",
+                f"{titik_pemesanan_ulang:.1f}",
                 status,
-                dt_str,
+                teks_waktu,
             ])
-        print("\n" + format_table(headers, rows))
+        print("\n" + format_tabel(judul_kolom, baris_data))
 
     # ==================== 6. PERAMALAN (FORECASTING) ====================
-    def menu_forecasting(self):
-        print_header("PERAMALAN PERMINTAAN (DEMAND FORECASTING)")
-        self.list_products()
-        prod_id_str = input("\nMasukkan ID Produk untuk melihat peramalan: ").strip()
-        if not prod_id_str.isdigit():
+    def menu_peramalan(self):
+        cetak_judul("PERAMALAN PERMINTAAN (DEMAND FORECASTING)")
+        self.tampilkan_produk()
+        teks_id_produk = input("\nMasukkan ID Produk untuk melihat peramalan: ").strip()
+        if not teks_id_produk.isdigit():
             print("ID produk tidak valid.")
             return
 
-        prod = self.product_repo.get_by_id(int(prod_id_str))
-        if not prod:
+        produk = self.repositori_produk.ambil_berdasarkan_id(int(teks_id_produk))
+        if not produk:
             print("Produk tidak ditemukan.")
             return
 
-        daily_sales = self.sales_repo.get_daily_sales(prod["product_id"], days=90)
-        if not daily_sales:
-            print(f"\nBelum ada riwayat penjualan untuk produk '{prod['name']}' dalam 90 hari terakhir.")
+        penjualan_harian = self.repositori_penjualan.ambil_penjualan_harian(produk["id_produk"], hari=90)
+        if not penjualan_harian:
+            print(f"\nBelum ada riwayat penjualan untuk produk '{produk['nama']}' dalam 90 hari terakhir.")
             print("Peramalan memerlukan data riwayat penjualan (Menu 4).")
             return
 
-        history_quantities = [float(row["total_quantity"]) for row in daily_sales]
-        stats = calculate_demand_statistics(history_quantities)
+        riwayat_kuantitas = [float(baris["total_kuantitas"]) for baris in penjualan_harian]
+        statistik = hitung_statistik_permintaan(riwayat_kuantitas)
 
-        ma_3 = moving_average(history_quantities, window_size=3)
-        ma_7 = moving_average(history_quantities, window_size=7)
-        ses = exponential_smoothing(history_quantities, alpha=0.3)
+        rata_rata_3 = rata_rata_bergerak(riwayat_kuantitas, ukuran_jendela=3)
+        rata_rata_7 = rata_rata_bergerak(riwayat_kuantitas, ukuran_jendela=7)
+        pemulusan = pemulusan_eksponensial(riwayat_kuantitas, alfa=0.3)
 
         print("\n" + "=" * 60)
-        print(f"             HASIL PERAMALAN: {prod['name']}")
+        print(f"             HASIL PERAMALAN: {produk['nama']}")
         print("=" * 60)
-        print(f"Jumlah Hari dengan Penjualan : {len(history_quantities)} hari")
-        print(f"Rata-rata Permintaan Harian  : {stats['average_daily_demand']:.2f} unit/hari")
-        print(f"Standar Deviasi Permintaan   : {stats['daily_demand_stddev']:.2f}")
-        print(f"Proyeksi Permintaan Tahunan  : {stats['annual_demand']:,.2f} unit/tahun")
+        print(f"Jumlah Hari dengan Penjualan : {len(riwayat_kuantitas)} hari")
+        print(f"Rata-rata Permintaan Harian  : {statistik['rata_rata_permintaan_harian']:.2f} unit/hari")
+        print(f"Standar Deviasi Permintaan   : {statistik['simpangan_baku_permintaan_harian']:.2f}")
+        print(f"Proyeksi Permintaan Tahunan  : {statistik['permintaan_tahunan']:,.2f} unit/tahun")
         print("-" * 60)
-        print(f"Forecast Moving Average (3 periode) : {ma_3:.2f} unit/hari")
-        print(f"Forecast Moving Average (7 periode) : {ma_7:.2f} unit/hari")
-        print(f"Forecast Exponential Smoothing (α=0.3): {ses:.2f} unit/hari")
+        print(f"Forecast Moving Average (3 periode) : {rata_rata_3:.2f} unit/hari")
+        print(f"Forecast Moving Average (7 periode) : {rata_rata_7:.2f} unit/hari")
+        print(f"Forecast Exponential Smoothing (α=0.3): {pemulusan:.2f} unit/hari")
         print("=" * 60)
 
     # ==================== 7. LAPORAN & GRAFIK ====================
-    def menu_reports(self):
+    def menu_laporan(self):
         while True:
-            print_header("LAPORAN & GRAFIK")
+            cetak_judul("LAPORAN & GRAFIK")
             print("1. Ringkasan Status & Nilai Inventaris")
             print("2. Laporan Produk Perlu Reorder / Kritis")
             print("3. Visualisasi Grafik Stok Barang (ASCII & PNG)")
             print("4. Ekspor Laporan Lengkap ke File Teks (output/reports/)")
             print("0. Kembali ke Menu Utama")
 
-            ch = input("Pilihan: ").strip()
-            if ch == "0":
+            pilihan = input("Pilihan: ").strip()
+            if pilihan == "0":
                 break
-            elif ch == "1":
-                self.show_inventory_summary()
-            elif ch == "2":
-                self.show_reorder_report()
-            elif ch == "3":
-                self.show_visual_chart()
-            elif ch == "4":
-                self.export_text_report()
+            elif pilihan == "1":
+                self.tampilkan_ringkasan_persediaan()
+            elif pilihan == "2":
+                self.tampilkan_laporan_pemesanan_ulang()
+            elif pilihan == "3":
+                self.tampilkan_grafik()
+            elif pilihan == "4":
+                self.ekspor_laporan_teks()
 
-    def show_inventory_summary(self):
-        products = self.product_repo.get_all()
-        report = generate_inventory_summary_report(products)
-        print("\n" + report)
+    def tampilkan_ringkasan_persediaan(self):
+        daftar_produk = self.repositori_produk.ambil_semua()
+        laporan = buat_laporan_ringkasan_persediaan(daftar_produk)
+        print("\n" + laporan)
 
-    def show_reorder_report(self):
-        analyses = self.analysis_repo.get_all_latest()
-        reorder_list = []
-        for a in analyses:
-            stock = float(a["stock_quantity"])
-            rop = float(a["reorder_point"])
-            ss = float(a["safety_stock"])
-            status = determine_stock_status(stock, rop, ss)
+    def tampilkan_laporan_pemesanan_ulang(self):
+        daftar_analisis = self.repositori_analisis.ambil_semua_terbaru()
+        daftar_pemesanan_ulang = []
+        for entri in daftar_analisis:
+            stok = float(entri["jumlah_stok"])
+            titik_pemesanan_ulang = float(entri["titik_pemesanan_ulang"])
+            stok_pengaman = float(entri["stok_pengaman"])
+            status = tentukan_status_stok(stok, titik_pemesanan_ulang, stok_pengaman)
             if status in ("HABIS", "KRITIS", "PERLU REORDER"):
-                reorder_list.append((a, status))
+                daftar_pemesanan_ulang.append((entri, status))
 
-        if not reorder_list:
+        if not daftar_pemesanan_ulang:
             print("\nSemua stok produk saat ini dalam batas aman!")
             return
 
-        headers = ["SKU", "Nama Produk", "Stok Fisik", "Reorder Point", "EOQ (Order)", "Status"]
-        rows = [
+        judul_kolom = ["SKU", "Nama Produk", "Stok Fisik", "Reorder Point", "EOQ (Order)", "Status"]
+        baris_data = [
             [
-                a["sku"],
-                a["product_name"][:22],
-                f"{float(a['stock_quantity']):.2f}",
-                f"{float(a['reorder_point']):.2f}",
-                f"{float(a['eoq']):.0f}",
+                entri["sku"],
+                entri["nama_produk"][:22],
+                f"{float(entri['jumlah_stok']):.2f}",
+                f"{float(entri['titik_pemesanan_ulang']):.2f}",
+                f"{float(entri['kuantitas_pemesanan_ekonomis']):.0f}",
                 status,
             ]
-            for a, status in reorder_list
+            for entri, status in daftar_pemesanan_ulang
         ]
-        print_header("DAFTAR PRODUK YANG HARUS DIORDER KEMBALI")
-        print(format_table(headers, rows))
+        cetak_judul("DAFTAR PRODUK YANG HARUS DIORDER KEMBALI")
+        print(format_tabel(judul_kolom, baris_data))
 
-    def show_visual_chart(self):
-        products = self.product_repo.get_all()
-        if not products:
+    def tampilkan_grafik(self):
+        daftar_produk = self.repositori_produk.ambil_semua()
+        if not daftar_produk:
             print("Belum ada data produk.")
             return
 
         # Tampilkan ASCII bar chart di terminal
-        items = [(p["name"][:18], float(p.get("stock_quantity", 0))) for p in products]
-        print(ascii_bar_chart("GRAFIK BATANG TINGKAT STOK BARANG", items))
+        daftar_item = [(produk["nama"][:18], float(produk.get("jumlah_stok", 0))) for produk in daftar_produk]
+        print(grafik_batang_ascii("GRAFIK BATANG TINGKAT STOK BARANG", daftar_item))
 
         # Simpan PNG chart jika matplotlib ada
-        png_path = generate_stock_chart(products)
-        if png_path:
-            print(f"\n[Info] Grafik PNG berhasil dibuat dan disimpan ke: {png_path}")
+        jalur_gambar_png = buat_grafik_stok(daftar_produk)
+        if jalur_gambar_png:
+            print(f"\n[Info] Grafik PNG berhasil dibuat dan disimpan ke: {jalur_gambar_png}")
         else:
             print("\n[Catatan] Library matplotlib tidak terinstall, grafik ditampilkan via ASCII.")
 
-    def export_text_report(self):
-        products = self.product_repo.get_all()
-        content = generate_inventory_summary_report(products)
-        filepath = save_text_report(content, filename_prefix="laporan_inventaris")
-        print(f"\n[SUKSES] Laporan tersimpan di: {filepath}")
+    def ekspor_laporan_teks(self):
+        daftar_produk = self.repositori_produk.ambil_semua()
+        isi = buat_laporan_ringkasan_persediaan(daftar_produk)
+        jalur_berkas = simpan_laporan_teks(isi, awalan_nama_berkas="laporan_inventaris")
+        print(f"\n[SUKSES] Laporan tersimpan di: {jalur_berkas}")
 
     # ==================== 8. IMPORT & EXPORT CSV ====================
-    def menu_import_export(self):
+    def menu_impor_ekspor(self):
         while True:
-            print_header("LAYANAN IMPORT & EXPORT CSV")
+            cetak_judul("LAYANAN IMPORT & EXPORT CSV")
             print("1. Export Seluruh Data Produk ke CSV (storage/exports/backups/)")
             print("2. Export Riwayat Transaksi ke CSV (storage/exports/backups/)")
             print("3. Export Riwayat Penjualan ke CSV (storage/exports/reports/)")
@@ -720,83 +716,83 @@ class SmartStockCLI:
             print("7. Buat Contoh Template File CSV di storage/imports/")
             print("0. Kembali ke Menu Utama")
 
-            ch = input("Pilihan: ").strip()
-            if ch == "0":
+            pilihan = input("Pilihan: ").strip()
+            if pilihan == "0":
                 break
-            elif ch == "1":
-                path = self.export_service.export_products_csv()
-                print(f"\n[SUKSES] File produk diekspor ke: {path}")
-            elif ch == "2":
-                path = self.export_service.export_transactions_csv()
-                print(f"\n[SUKSES] File transaksi diekspor ke: {path}")
-            elif ch == "3":
-                path = self.export_service.export_sales_csv()
-                print(f"\n[SUKSES] File penjualan diekspor ke: {path}")
-            elif ch == "4":
-                path = self.export_service.export_inventory_analysis_csv()
-                print(f"\n[SUKSES] File analisis diekspor ke: {path}")
-            elif ch == "5":
-                self.import_products_flow()
-            elif ch == "6":
-                self.import_suppliers_flow()
-            elif ch == "7":
-                self.import_service.generate_sample_templates()
-                print(f"\n[SUKSES] Template dibuat di direktori: {IMPORTS_DIR}")
+            elif pilihan == "1":
+                jalur = self.layanan_ekspor.ekspor_produk_ke_csv()
+                print(f"\n[SUKSES] File produk diekspor ke: {jalur}")
+            elif pilihan == "2":
+                jalur = self.layanan_ekspor.ekspor_transaksi_ke_csv()
+                print(f"\n[SUKSES] File transaksi diekspor ke: {jalur}")
+            elif pilihan == "3":
+                jalur = self.layanan_ekspor.ekspor_penjualan_ke_csv()
+                print(f"\n[SUKSES] File penjualan diekspor ke: {jalur}")
+            elif pilihan == "4":
+                jalur = self.layanan_ekspor.ekspor_analisis_persediaan_ke_csv()
+                print(f"\n[SUKSES] File analisis diekspor ke: {jalur}")
+            elif pilihan == "5":
+                self.alur_impor_produk()
+            elif pilihan == "6":
+                self.alur_impor_pemasok()
+            elif pilihan == "7":
+                self.layanan_impor.buat_template_contoh()
+                print(f"\n[SUKSES] Template dibuat di direktori: {DIREKTORI_IMPOR}")
 
-    def import_products_flow(self):
-        files = list(IMPORTS_DIR.glob("*.csv"))
-        if not files:
-            print(f"\nTidak ada file CSV di direktori: {IMPORTS_DIR}")
+    def alur_impor_produk(self):
+        daftar_berkas = list(DIREKTORI_IMPOR.glob("*.csv"))
+        if not daftar_berkas:
+            print(f"\nTidak ada file CSV di direktori: {DIREKTORI_IMPOR}")
             print("Silakan letakkan file CSV Anda di direktori tersebut atau buat template (Pilihan 7).")
             return
 
         print("\nDaftar File CSV di folder storage/imports/:")
-        for idx, f in enumerate(files, start=1):
-            print(f"  {idx}. {f.name}")
+        for indeks, berkas in enumerate(daftar_berkas, start=1):
+            print(f"  {indeks}. {berkas.name}")
 
-        choice = input("Pilih nomor file: ").strip()
-        if not choice.isdigit() or not (1 <= int(choice) <= len(files)):
+        pilihan = input("Pilih nomor file: ").strip()
+        if not pilihan.isdigit() or not (1 <= int(pilihan) <= len(daftar_berkas)):
             print("Pilihan nomor tidak valid.")
             return
 
-        target_file = files[int(choice) - 1]
-        print(f"\nMemproses import dari: {target_file.name} ...")
-        success, fail, errors = self.import_service.import_products_from_csv(target_file)
+        berkas_tujuan = daftar_berkas[int(pilihan) - 1]
+        print(f"\nMemproses import dari: {berkas_tujuan.name} ...")
+        berhasil, gagal, daftar_kesalahan = self.layanan_impor.impor_produk_dari_csv(berkas_tujuan)
         print(f"\n[HASIL IMPORT PRODUK]")
-        print(f"- Sukses disimpan : {success} baris")
-        print(f"- Gagal / Duplikat: {fail} baris")
-        if errors:
+        print(f"- Sukses disimpan : {berhasil} baris")
+        print(f"- Gagal / Duplikat: {gagal} baris")
+        if daftar_kesalahan:
             print("\nRincian pesan:")
-            for err in errors[:10]:
-                print(f"  * {err}")
+            for kesalahan in daftar_kesalahan[:10]:
+                print(f"  * {kesalahan}")
 
-    def import_suppliers_flow(self):
-        files = list(IMPORTS_DIR.glob("*.csv"))
-        if not files:
-            print(f"\nTidak ada file CSV di direktori: {IMPORTS_DIR}")
+    def alur_impor_pemasok(self):
+        daftar_berkas = list(DIREKTORI_IMPOR.glob("*.csv"))
+        if not daftar_berkas:
+            print(f"\nTidak ada file CSV di direktori: {DIREKTORI_IMPOR}")
             return
 
         print("\nDaftar File CSV di folder storage/imports/:")
-        for idx, f in enumerate(files, start=1):
-            print(f"  {idx}. {f.name}")
+        for indeks, berkas in enumerate(daftar_berkas, start=1):
+            print(f"  {indeks}. {berkas.name}")
 
-        choice = input("Pilih nomor file: ").strip()
-        if not choice.isdigit() or not (1 <= int(choice) <= len(files)):
+        pilihan = input("Pilih nomor file: ").strip()
+        if not pilihan.isdigit() or not (1 <= int(pilihan) <= len(daftar_berkas)):
             print("Pilihan nomor tidak valid.")
             return
 
-        target_file = files[int(choice) - 1]
-        print(f"\nMemproses import dari: {target_file.name} ...")
-        success, fail, errors = self.import_service.import_suppliers_from_csv(target_file)
+        berkas_tujuan = daftar_berkas[int(pilihan) - 1]
+        print(f"\nMemproses import dari: {berkas_tujuan.name} ...")
+        berhasil, gagal, daftar_kesalahan = self.layanan_impor.impor_pemasok_dari_csv(berkas_tujuan)
         print(f"\n[HASIL IMPORT SUPPLIER]")
-        print(f"- Sukses disimpan : {success} baris")
-        print(f"- Gagal / Duplikat: {fail} baris")
-        if errors:
+        print(f"- Sukses disimpan : {berhasil} baris")
+        print(f"- Gagal / Duplikat: {gagal} baris")
+        if daftar_kesalahan:
             print("\nRincian pesan:")
-            for err in errors[:10]:
-                print(f"  * {err}")
+            for kesalahan in daftar_kesalahan[:10]:
+                print(f"  * {kesalahan}")
 
 
-def run_cli():
-    cli = SmartStockCLI()
-    cli.run()
+def jalankan_cli():
+    antarmuka = AntarmukaSmartStockCLI()
+    antarmuka.jalankan()

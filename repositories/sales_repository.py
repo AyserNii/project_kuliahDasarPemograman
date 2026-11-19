@@ -4,149 +4,149 @@ from typing import Any, Dict, List, Optional
 import uuid
 from psycopg.rows import dict_row
 
-from database.connection import get_connection
+from database.connection import buat_koneksi
 
 
-class SalesRepository:
+class RepositoriPenjualan:
     """Repository untuk operasi tabel sales_history di database PostgreSQL."""
 
-    def __init__(self, connection=None):
-        self._connection = connection
+    def __init__(self, koneksi=None):
+        self._koneksi = koneksi
 
-    def _get_conn(self):
-        return self._connection if self._connection else get_connection()
+    def _ambil_koneksi(self):
+        return self._koneksi if self._koneksi else buat_koneksi()
 
-    def get_all(self, limit: int = 100) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
+    def ambil_semua(self, batas: int = 100) -> List[Dict[str, Any]]:
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
                     """
-                    SELECT s.*, p.sku, p.name as product_name, t.transaction_code
+                    SELECT s.*, p.sku, p.nama as nama_produk, t.kode_transaksi
                     FROM sales_history s
-                    JOIN products p ON s.product_id = p.product_id
-                    JOIN transactions t ON s.transaction_id = t.transaction_id
-                    ORDER BY s.sale_date DESC
+                    JOIN products p ON s.id_produk = p.id_produk
+                    JOIN transactions t ON s.id_transaksi = t.id_transaksi
+                    ORDER BY s.tanggal_penjualan DESC
                     LIMIT %s
                     """,
-                    (limit,),
+                    (batas,),
                 )
-                return cur.fetchall()
+                return kursor.fetchall()
 
-    def get_by_product(self, product_id: int, limit: int = 100) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
+    def ambil_berdasarkan_produk(self, id_produk: int, batas: int = 100) -> List[Dict[str, Any]]:
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
                     """
-                    SELECT s.*, p.sku, p.name as product_name, t.transaction_code
+                    SELECT s.*, p.sku, p.nama as nama_produk, t.kode_transaksi
                     FROM sales_history s
-                    JOIN products p ON s.product_id = p.product_id
-                    JOIN transactions t ON s.transaction_id = t.transaction_id
-                    WHERE s.product_id = %s
-                    ORDER BY s.sale_date DESC
+                    JOIN products p ON s.id_produk = p.id_produk
+                    JOIN transactions t ON s.id_transaksi = t.id_transaksi
+                    WHERE s.id_produk = %s
+                    ORDER BY s.tanggal_penjualan DESC
                     LIMIT %s
                     """,
-                    (product_id, limit),
+                    (id_produk, batas),
                 )
-                return cur.fetchall()
+                return kursor.fetchall()
 
-    def record_sale(
+    def catat_penjualan(
         self,
-        product_id: int,
-        quantity_sold: float,
-        unit_price: float,
-        transaction_code: Optional[str] = None,
-        sale_date: Optional[datetime] = None,
-        notes: Optional[str] = None,
+        id_produk: int,
+        kuantitas_terjual: float,
+        harga_satuan: float,
+        kode_transaksi: Optional[str] = None,
+        tanggal_penjualan: Optional[datetime] = None,
+        catatan: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Mencatat penjualan: membuat transaksi OUT, memperbarui stok produk,
         dan menyimpan baris ke sales_history.
         """
-        qty = Decimal(str(quantity_sold))
-        if qty <= 0:
+        kuantitas = Decimal(str(kuantitas_terjual))
+        if kuantitas <= 0:
             raise ValueError("Kuantitas penjualan harus lebih besar dari 0")
 
-        price = Decimal(str(unit_price))
-        if price < 0:
+        harga = Decimal(str(harga_satuan))
+        if harga < 0:
             raise ValueError("Harga satuan tidak boleh negatif")
 
-        dt = sale_date or datetime.now(timezone.utc)
-        code = transaction_code or f"SALE-{uuid.uuid4().hex[:8].upper()}"
+        waktu = tanggal_penjualan or datetime.now(timezone.utc)
+        kode = kode_transaksi or f"SALE-{uuid.uuid4().hex[:8].upper()}"
 
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
                 # Cek stok saat ini
-                cur.execute(
-                    "SELECT stock_quantity, unit_cost FROM products WHERE product_id = %s FOR UPDATE",
-                    (product_id,),
+                kursor.execute(
+                    "SELECT jumlah_stok, biaya_satuan FROM products WHERE id_produk = %s FOR UPDATE",
+                    (id_produk,),
                 )
-                prod = cur.fetchone()
-                if not prod:
-                    raise ValueError(f"Produk dengan ID {product_id} tidak ditemukan")
+                produk = kursor.fetchone()
+                if not produk:
+                    raise ValueError(f"Produk dengan ID {id_produk} tidak ditemukan")
 
-                if prod["stock_quantity"] < qty:
+                if produk["jumlah_stok"] < kuantitas:
                     raise ValueError(
-                        f"Stok tidak mencukupi untuk penjualan. Stok: {prod['stock_quantity']}, diminta: {qty}"
+                        f"Stok tidak mencukupi untuk penjualan. Stok: {produk['jumlah_stok']}, diminta: {kuantitas}"
                     )
 
-                unit_cost = prod["unit_cost"]
+                biaya_satuan = produk["biaya_satuan"]
 
                 # 1. Masukkan ke transactions (OUT)
-                cur.execute(
+                kursor.execute(
                     """
                     INSERT INTO transactions (
-                        transaction_code, product_id, supplier_id,
-                        transaction_type, quantity, unit_cost, transaction_date, notes
+                        kode_transaksi, id_produk, id_pemasok,
+                        jenis_transaksi, kuantitas, biaya_satuan, tanggal_transaksi, catatan
                     )
                     VALUES (%s, %s, NULL, 'OUT', %s, %s, %s, %s)
-                    RETURNING transaction_id
+                    RETURNING id_transaksi
                     """,
-                    (code, product_id, qty, unit_cost, dt, notes or "Penjualan Barang"),
+                    (kode, id_produk, kuantitas, biaya_satuan, waktu, catatan or "Penjualan Barang"),
                 )
-                txn_id = cur.fetchone()["transaction_id"]
+                id_transaksi = kursor.fetchone()["id_transaksi"]
 
                 # 2. Kurangi stok produk
-                cur.execute(
+                kursor.execute(
                     """
                     UPDATE products
-                    SET stock_quantity = stock_quantity - %s
-                    WHERE product_id = %s
+                    SET jumlah_stok = jumlah_stok - %s
+                    WHERE id_produk = %s
                     """,
-                    (qty, product_id),
+                    (kuantitas, id_produk),
                 )
 
                 # 3. Masukkan ke sales_history
-                cur.execute(
+                kursor.execute(
                     """
                     INSERT INTO sales_history (
-                        transaction_id, product_id, quantity_sold, unit_price, sale_date, notes
+                        id_transaksi, id_produk, kuantitas_terjual, harga_satuan, tanggal_penjualan, catatan
                     )
                     VALUES (%s, %s, %s, %s, %s, %s)
                     RETURNING *
                     """,
-                    (txn_id, product_id, qty, price, dt, notes),
+                    (id_transaksi, id_produk, kuantitas, harga, waktu, catatan),
                 )
-                sale_record = cur.fetchone()
+                catatan_penjualan = kursor.fetchone()
 
-                conn.commit()
-                return sale_record
+                koneksi.commit()
+                return catatan_penjualan
 
-    def get_daily_sales(self, product_id: int, days: int = 90) -> List[Dict[str, Any]]:
+    def ambil_penjualan_harian(self, id_produk: int, hari: int = 90) -> List[Dict[str, Any]]:
         """Mengambil rekap penjualan harian produk untuk analisis peramalan."""
-        with self._get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
                     """
-                    SELECT DATE(sale_date) as sale_day,
-                           SUM(quantity_sold) as total_quantity,
-                           SUM(quantity_sold * unit_price) as total_revenue,
-                           COUNT(*) as transaction_count
+                    SELECT DATE(tanggal_penjualan) as hari_penjualan,
+                           SUM(kuantitas_terjual) as total_kuantitas,
+                           SUM(kuantitas_terjual * harga_satuan) as total_pendapatan,
+                           COUNT(*) as jumlah_transaksi
                     FROM sales_history
-                    WHERE product_id = %s
-                      AND sale_date >= CURRENT_DATE - (%s || ' days')::INTERVAL
-                    GROUP BY DATE(sale_date)
-                    ORDER BY sale_day ASC
+                    WHERE id_produk = %s
+                      AND tanggal_penjualan >= CURRENT_DATE - (%s || ' days')::INTERVAL
+                    GROUP BY DATE(tanggal_penjualan)
+                    ORDER BY hari_penjualan ASC
                     """,
-                    (product_id, days),
+                    (id_produk, hari),
                 )
-                return cur.fetchall()
+                return kursor.fetchall()

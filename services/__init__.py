@@ -1,5 +1,5 @@
-from services.import_service import ImportService
-from services.export_service import ExportService
-from services.inventory_service import InventoryService
+from services.import_service import LayananImpor
+from services.export_service import LayananEkspor
+from services.inventory_service import LayananPersediaan
 
-__all__ = ["ImportService", "ExportService", "InventoryService"]
+__all__ = ["LayananImpor", "LayananEkspor", "LayananPersediaan"]
