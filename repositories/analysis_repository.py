@@ -12,7 +12,7 @@ class RepositoriAnalisis:
     def __init__(self, koneksi=None):
         self._koneksi = koneksi
 
-    def _ambil_koneksi(self):
+    def ambil_koneksi(self):
         return self._koneksi if self._koneksi else buat_koneksi()
 
     def simpan(
@@ -32,7 +32,7 @@ class RepositoriAnalisis:
     ) -> Dict[str, Any]:
         tanggal_tujuan = tanggal_analisis or date.today()
 
-        with self._ambil_koneksi() as koneksi:
+        with self.ambil_koneksi() as koneksi:
             with koneksi.cursor(row_factory=dict_row) as kursor:
                 kursor.execute(
                     """
@@ -76,7 +76,7 @@ class RepositoriAnalisis:
                 return hasil
 
     def ambil_terbaru_berdasarkan_produk(self, id_produk: int) -> Optional[Dict[str, Any]]:
-        with self._ambil_koneksi() as koneksi:
+        with self.ambil_koneksi() as koneksi:
             with koneksi.cursor(row_factory=dict_row) as kursor:
                 kursor.execute(
                     """
@@ -92,7 +92,7 @@ class RepositoriAnalisis:
                 return kursor.fetchone()
 
     def ambil_semua_terbaru(self) -> List[Dict[str, Any]]:
-        with self._ambil_koneksi() as koneksi:
+        with self.ambil_koneksi() as koneksi:
             with koneksi.cursor(row_factory=dict_row) as kursor:
                 kursor.execute(
                     """
@@ -106,7 +106,7 @@ class RepositoriAnalisis:
                 return kursor.fetchall()
 
     def ambil_riwayat_berdasarkan_produk(self, id_produk: int, batas: int = 30) -> List[Dict[str, Any]]:
-        with self._ambil_koneksi() as koneksi:
+        with self.ambil_koneksi() as koneksi:
             with koneksi.cursor(row_factory=dict_row) as kursor:
                 kursor.execute(
                     """

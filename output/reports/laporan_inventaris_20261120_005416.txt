@@ -1,0 +1,9 @@
+============================================================
+             RINGKASAN STATUS INVENTARIS
+        Waktu Pembuatan: 2026-11-20 00:54:16
+============================================================
+Total Jenis Produk      : 3
+Total Kuantitas Fisik   : 218.00 unit
+Total Nilai Aset Stok   : Rp 6,785,000.00
+Jumlah Produk Menipis   : 0 item
+------------------------------------------------------------

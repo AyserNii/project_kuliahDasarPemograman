@@ -1,2 +1,3 @@
-sku,nama,kategori,kode_pemasok,satuan,jumlah_stok,biaya_satuan,harga_jual,stok_minimum
-BRG-003,Susu Bubuk 500g,Bahan Minuman,SUP-001,pcs,50,25000,32000,10
+sku;nama;kategori;kode_pemasok;satuan;jumlah_stok;biaya_satuan;harga_jual;stok_minimum
+BRG-003;Susu Bubuk 500g;Bahan Minuman;SUP-001;pcs;50;25000;32000;10
+BRG-004;Sirup Karamel 750ml;Bahan Minuman;SUP-001;botol;30;45000;58000;8

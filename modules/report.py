@@ -162,3 +162,14 @@ def grafik_batang_ascii(judul: str, daftar_item: List[tuple]) -> str:
         )
 
     return "\n".join(baris_teks)
+
+
+# Alias Kompatibilitas
+hasilkan_laporan_ringkasan_inventaris = buat_laporan_ringkasan_persediaan
+generate_inventory_summary_report = buat_laporan_ringkasan_persediaan
+hasilkan_grafik_stok = buat_grafik_stok
+generate_stock_chart = buat_grafik_stok
+save_text_report = simpan_laporan_teks
+format_table = format_tabel
+ascii_bar_chart = grafik_batang_ascii
+dataframe_to_string_table = ubah_dataframe_ke_tabel_teks

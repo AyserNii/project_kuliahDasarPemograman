@@ -1,0 +1,4 @@
+﻿id_analisis;id_produk;tanggal_analisis;permintaan_tahunan;biaya_pemesanan;biaya_penyimpanan_per_unit_tahun;rata_rata_permintaan_harian;simpangan_baku_permintaan_harian;waktu_tunggu_hari;skor_z;kuantitas_pemesanan_ekonomis;stok_pengaman;titik_pemesanan_ulang;sku;nama_produk;jumlah_stok;satuan;biaya_satuan
+7;1;2026-11-20;2555.00;50000.00;9000.00;7.00;0.00;5.00;1.650;168.49;0.00;35.00;BRG-001;Kopi Arabika 250 g;93.00;pcs;45000.00
+8;2;2026-11-20;1825.00;50000.00;3600.00;5.00;0.00;5.00;1.650;225.15;0.00;25.00;BRG-002;Teh Melati 100 g;75.00;pcs;18000.00
+9;19;2026-11-20;4380.00;50000.00;2400.00;12.00;0.00;5.00;1.650;427.20;0.00;60.00;BRG-003;Milo;109.00;Kg;12000.00

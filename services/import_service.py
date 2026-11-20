@@ -55,7 +55,9 @@ class LayananImpor:
 
         # Membaca data CSV ke dalam Pandas DataFrame
         kerangka_data = _normalkan_kolom_csv_lama(
-            pd.read_csv(jalur_berkas, dtype=str).fillna("")
+            pd.read_csv(
+                jalur_berkas, sep=None, engine="python", dtype=str, encoding="utf-8-sig"
+            ).fillna("")
         )
 
         jumlah_berhasil = 0
@@ -105,7 +107,9 @@ class LayananImpor:
 
         # Membaca data CSV ke dalam Pandas DataFrame
         kerangka_data = _normalkan_kolom_csv_lama(
-            pd.read_csv(jalur_berkas, dtype=str).fillna("")
+            pd.read_csv(
+                jalur_berkas, sep=None, engine="python", dtype=str, encoding="utf-8-sig"
+            ).fillna("")
         )
 
         jumlah_berhasil = 0
@@ -173,7 +177,12 @@ class LayananImpor:
             "stok_minimum": [10, 8],
         }
         kerangka_produk = pd.DataFrame(data_produk)
-        kerangka_produk.to_csv(DIREKTORI_IMPOR / "template_products.csv", index=False)
+        kerangka_produk.to_csv(
+            DIREKTORI_IMPOR / "template_products.csv",
+            index=False,
+            sep=";",
+            encoding="utf-8-sig",
+        )
 
         data_pemasok = {
             "kode_pemasok": ["SUP-002"],
@@ -183,4 +192,9 @@ class LayananImpor:
             "alamat": ["Bandung"],
         }
         kerangka_pemasok = pd.DataFrame(data_pemasok)
-        kerangka_pemasok.to_csv(DIREKTORI_IMPOR / "template_suppliers.csv", index=False)
+        kerangka_pemasok.to_csv(
+            DIREKTORI_IMPOR / "template_suppliers.csv",
+            index=False,
+            sep=";",
+            encoding="utf-8-sig",
+        )

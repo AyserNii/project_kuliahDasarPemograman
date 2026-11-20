@@ -2,6 +2,7 @@ from datetime import datetime
 
 from config.settings import DIREKTORI_IMPOR
 from modules.analysis import tentukan_status_stok
+from psycopg.errors import ForeignKeyViolation
 from modules.forecasting import hitung_statistik_permintaan, pemulusan_eksponensial, rata_rata_bergerak
 from modules.report import (
     grafik_batang_ascii,
@@ -257,6 +258,11 @@ class AntarmukaSmartStockCLI:
                     print("\n[SUKSES] Produk berhasil dihapus.")
                 else:
                     print("\n[Gagal] Produk tidak dapat dihapus.")
+            except ForeignKeyViolation:
+                print(
+                    "\n[Gagal] Produk masih digunakan dalam transaksi atau analisis inventaris. "
+                    "Riwayat terkait harus tetap dipertahankan, jadi produk tidak dihapus."
+                )
             except Exception as kesalahan:
                 print(f"\n[Gagal] Tidak dapat menghapus produk: {kesalahan}")
 
@@ -527,25 +533,53 @@ class AntarmukaSmartStockCLI:
             rekomendasi = hasil["rekomendasi"]
             biaya = hasil["biaya"]
 
-            print("\n" + "=" * 60)
-            print("                 HASIL PERHITUNGAN INVENTORY")
-            print("=" * 60)
-            print(f"Produk                    : {produk['nama']} (SKU: {produk['sku']})")
-            print(f"Permintaan Tahunan (D)    : {float(entri['permintaan_tahunan']):,.2f} unit/tahun")
-            print(f"Biaya Pesan (S)           : Rp {float(entri['biaya_pemesanan']):,.2f}")
-            print(f"Biaya Simpan/Unit/Thn (H) : Rp {float(entri['biaya_penyimpanan_per_unit_tahun']):,.2f}")
-            print("-" * 60)
-            print(f"1. Economic Order Qty (EOQ): {float(entri['kuantitas_pemesanan_ekonomis']):,.2f} unit (Jumlah pesan optimal)")
-            print(f"2. Safety Stock (SS)      : {float(entri['stok_pengaman']):,.2f} unit (Persediaan pengaman)")
-            print(f"3. Reorder Point (ROP)     : {float(entri['titik_pemesanan_ulang']):,.2f} unit (Titik order kembali)")
-            print("-" * 60)
-            print(f"Frekuensi Pemesanan/Tahun  : {biaya['jumlah_pemesanan_per_tahun']} kali/tahun")
-            print(f"Siklus Pemesanan           : Setiap ~{biaya['hari_siklus_pemesanan']} hari")
-            print(f"Total Biaya Persediaan/Thn : Rp {biaya['total_biaya']:,.2f}")
-            print("-" * 60)
-            print(f"STATUS STOK SAAT INI      : [{rekomendasi['status']}] (Stok Fisik: {rekomendasi['stok_saat_ini']:.2f})")
-            print(f"REKOMENDASI SISTEM        : {rekomendasi['tindakan']}")
-            print("=" * 60)
+            judul_kolom = ["Indikator", "Nilai"]
+            baris_data = [
+                ["Produk", f"{produk['nama']} (SKU: {produk['sku']})"],
+                [
+                    "Permintaan Tahunan (D)",
+                    f"{float(entri['permintaan_tahunan']):,.2f} unit/tahun",
+                ],
+                [
+                    "Biaya Pemesanan (S)",
+                    f"Rp {float(entri['biaya_pemesanan']):,.2f}",
+                ],
+                [
+                    "Biaya Simpan per Unit per Tahun (H)",
+                    f"Rp {float(entri['biaya_penyimpanan_per_unit_tahun']):,.2f}",
+                ],
+                [
+                    "Kuantitas Pesan Ekonomis (EOQ)",
+                    f"{float(entri['kuantitas_pemesanan_ekonomis']):,.2f} unit",
+                ],
+                [
+                    "Stok Pengaman (SS)",
+                    f"{float(entri['stok_pengaman']):,.2f} unit",
+                ],
+                [
+                    "Titik Pemesanan Ulang (ROP)",
+                    f"{float(entri['titik_pemesanan_ulang']):,.2f} unit",
+                ],
+                [
+                    "Frekuensi Pemesanan",
+                    f"{biaya['jumlah_pemesanan_per_tahun']} kali/tahun",
+                ],
+                [
+                    "Siklus Pemesanan",
+                    f"Setiap sekitar {biaya['hari_siklus_pemesanan']} hari",
+                ],
+                [
+                    "Total Biaya Persediaan per Tahun",
+                    f"Rp {biaya['total_biaya']:,.2f}",
+                ],
+                [
+                    "Status Stok",
+                    f"{rekomendasi['status']} (stok fisik: {rekomendasi['stok_saat_ini']:.2f})",
+                ],
+            ]
+            print("\nHASIL ANALISIS PERSEDIAAN")
+            print(format_tabel(judul_kolom, baris_data))
+            print(f"\nRekomendasi: {rekomendasi['tindakan']}")
             print("[Info] Hasil analisis berhasil disimpan ke tabel inventory_analysis.")
         except Exception as kesalahan:
             print(f"\n[Gagal] {kesalahan}")
@@ -610,18 +644,28 @@ class AntarmukaSmartStockCLI:
         rata_rata_7 = rata_rata_bergerak(riwayat_kuantitas, ukuran_jendela=7)
         pemulusan = pemulusan_eksponensial(riwayat_kuantitas, alfa=0.3)
 
-        print("\n" + "=" * 60)
-        print(f"             HASIL PERAMALAN: {produk['nama']}")
-        print("=" * 60)
-        print(f"Jumlah Hari dengan Penjualan : {len(riwayat_kuantitas)} hari")
-        print(f"Rata-rata Permintaan Harian  : {statistik['rata_rata_permintaan_harian']:.2f} unit/hari")
-        print(f"Standar Deviasi Permintaan   : {statistik['simpangan_baku_permintaan_harian']:.2f}")
-        print(f"Proyeksi Permintaan Tahunan  : {statistik['permintaan_tahunan']:,.2f} unit/tahun")
-        print("-" * 60)
-        print(f"Forecast Moving Average (3 periode) : {rata_rata_3:.2f} unit/hari")
-        print(f"Forecast Moving Average (7 periode) : {rata_rata_7:.2f} unit/hari")
-        print(f"Forecast Exponential Smoothing (α=0.3): {pemulusan:.2f} unit/hari")
-        print("=" * 60)
+        judul_kolom = ["Indikator", "Nilai"]
+        baris_data = [
+            ["Produk", produk["nama"]],
+            ["Hari dengan Penjualan", f"{len(riwayat_kuantitas)} hari"],
+            [
+                "Rata-rata Permintaan Harian",
+                f"{statistik['rata_rata_permintaan_harian']:.2f} unit/hari",
+            ],
+            [
+                "Simpangan Baku Permintaan",
+                f"{statistik['simpangan_baku_permintaan_harian']:.2f}",
+            ],
+            [
+                "Proyeksi Permintaan Tahunan",
+                f"{statistik['permintaan_tahunan']:,.2f} unit/tahun",
+            ],
+            ["Rata-rata Bergerak (3 periode)", f"{rata_rata_3:.2f} unit/hari"],
+            ["Rata-rata Bergerak (7 periode)", f"{rata_rata_7:.2f} unit/hari"],
+            ["Pemulusan Eksponensial (alfa 0.3)", f"{pemulusan:.2f} unit/hari"],
+        ]
+        print("\nHASIL PERAMALAN PERMINTAAN")
+        print(format_tabel(judul_kolom, baris_data))
 
     # ==================== 7. LAPORAN & GRAFIK ====================
     def menu_laporan(self):

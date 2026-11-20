@@ -23,8 +23,8 @@ class TestImportExport(unittest.TestCase):
             result_path = self.layanan_ekspor.ekspor_produk_ke_csv(jalur_keluaran=out_file)
             self.assertTrue(result_path.exists())
 
-            with open(result_path, mode="r", encoding="utf-8") as berkas:
-                reader = csv.reader(berkas)
+            with open(result_path, mode="r", encoding="utf-8-sig") as berkas:
+                reader = csv.reader(berkas, delimiter=";")
                 header = next(reader)
                 self.assertIn("sku", header)
                 self.assertIn("nama", header)

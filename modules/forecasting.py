@@ -102,4 +102,20 @@ def hitung_statistik_permintaan(kuantitas_harian: List[float]) -> Dict[str, floa
         "rata_rata_permintaan_harian": round(rata_rata, 2),
         "simpangan_baku_permintaan_harian": round(simpangan_baku, 2),
         "permintaan_tahunan": round(tahunan, 2),
+        "rata_rata_harian": round(rata_rata, 2),
+        "standar_deviasi_harian": round(simpangan_baku, 2),
+        "proyeksi_tahunan": round(tahunan, 2),
+        "average_daily_demand": round(rata_rata, 2),
+        "daily_demand_stddev": round(simpangan_baku, 2),
+        "annual_demand": round(tahunan, 2),
     }
+
+
+# Alias kompatibilitas
+moving_average = rata_rata_bergerak
+weighted_moving_average = rata_rata_bergerak_tertimbang
+exponential_smoothing = pemulusan_eksponensial
+hitung_rata_rata_bergerak = rata_rata_bergerak
+peramalan_eksponensial = pemulusan_eksponensial
+calculate_demand_statistics = hitung_statistik_permintaan
+pandas_rolling_forecast = peramalan_rata_rata_bergerak_pandas

@@ -1,0 +1,4 @@
+﻿id_produk;sku;nama;kategori;id_pemasok;satuan;jumlah_stok;biaya_satuan;harga_jual;stok_minimum;waktu_dibuat;nama_pemasok;kode_pemasok
+1;BRG-001;Kopi Arabika 250 g;Minuman;1;pcs;93.00;45000.00;60000.00;20.00;2026-11-19 09:36:46.429470+07:00;Sumber Pangan Nusantara;SUP-001
+2;BRG-002;Teh Melati 100 g;Minuman;1;pcs;75.00;18000.00;25000.00;15.00;2026-11-19 09:36:46.429470+07:00;Sumber Pangan Nusantara;SUP-001
+18;BRG-003;Susu Bubuk 500g;Bahan Minuman;1;pcs;50.00;25000.00;32000.00;10.00;2026-11-20 00:31:19.418220+07:00;Sumber Pangan Nusantara;SUP-001

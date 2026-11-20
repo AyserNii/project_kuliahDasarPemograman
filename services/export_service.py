@@ -35,7 +35,9 @@ class LayananEkspor:
         berkas_tujuan = jalur_keluaran or (DIREKTORI_CADANGAN_EKSPOR / f"products_backup_{cap_waktu}.csv")
 
         kerangka_data = pd.DataFrame(daftar_produk)
-        kerangka_data.to_csv(berkas_tujuan, index=False)
+        kerangka_data.to_csv(
+            berkas_tujuan, index=False, sep=";", encoding="utf-8-sig"
+        )
         return berkas_tujuan
 
     def ekspor_transaksi_ke_csv(self, jalur_keluaran: Optional[Path] = None) -> Path:
@@ -45,7 +47,9 @@ class LayananEkspor:
         berkas_tujuan = jalur_keluaran or (DIREKTORI_CADANGAN_EKSPOR / f"transactions_backup_{cap_waktu}.csv")
 
         kerangka_data = pd.DataFrame(daftar_transaksi)
-        kerangka_data.to_csv(berkas_tujuan, index=False)
+        kerangka_data.to_csv(
+            berkas_tujuan, index=False, sep=";", encoding="utf-8-sig"
+        )
         return berkas_tujuan
 
     def ekspor_penjualan_ke_csv(self, jalur_keluaran: Optional[Path] = None) -> Path:
@@ -55,7 +59,9 @@ class LayananEkspor:
         berkas_tujuan = jalur_keluaran or (DIREKTORI_LAPORAN_EKSPOR / f"sales_report_{cap_waktu}.csv")
 
         kerangka_data = pd.DataFrame(daftar_penjualan)
-        kerangka_data.to_csv(berkas_tujuan, index=False)
+        kerangka_data.to_csv(
+            berkas_tujuan, index=False, sep=";", encoding="utf-8-sig"
+        )
         return berkas_tujuan
 
     def ekspor_analisis_persediaan_ke_csv(self, jalur_keluaran: Optional[Path] = None) -> Path:
@@ -65,5 +71,7 @@ class LayananEkspor:
         berkas_tujuan = jalur_keluaran or (DIREKTORI_LAPORAN_EKSPOR / f"inventory_analysis_{cap_waktu}.csv")
 
         kerangka_data = pd.DataFrame(daftar_analisis)
-        kerangka_data.to_csv(berkas_tujuan, index=False)
+        kerangka_data.to_csv(
+            berkas_tujuan, index=False, sep=";", encoding="utf-8-sig"
+        )
         return berkas_tujuan

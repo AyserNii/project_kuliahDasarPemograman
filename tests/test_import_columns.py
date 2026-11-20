@@ -58,6 +58,39 @@ class TestKolomImporLama(unittest.TestCase):
         self.assertEqual(repositori_produk.data_tersimpan["nama"], "Produk Lama")
         self.assertEqual(repositori_produk.data_tersimpan["satuan"], "pcs")
 
+    def test_import_menerima_pemisah_titik_koma_excel(self):
+        repositori_produk = RepositoriProdukPalsu()
+        layanan = LayananImpor(
+            repositori_produk=repositori_produk,
+            repositori_pemasok=RepositoriPemasokPalsu(),
+        )
+
+        with tempfile.TemporaryDirectory() as direktori:
+            jalur_csv = Path(direktori) / "produk_excel.csv"
+            with jalur_csv.open("w", newline="", encoding="utf-8-sig") as berkas:
+                penulis = csv.writer(berkas, delimiter=";")
+                penulis.writerow(
+                    [
+                        "sku",
+                        "nama",
+                        "kategori",
+                        "kode_pemasok",
+                        "satuan",
+                        "jumlah_stok",
+                        "biaya_satuan",
+                        "harga_jual",
+                        "stok_minimum",
+                    ]
+                )
+                penulis.writerow(
+                    ["BRG-EXCEL", "Produk Excel", "Minuman", "", "pcs", "4", "10", "15", "1"]
+                )
+
+            berhasil, gagal, _ = layanan.impor_produk_dari_csv(jalur_csv)
+
+        self.assertEqual((berhasil, gagal), (1, 0))
+        self.assertEqual(repositori_produk.data_tersimpan["sku"], "BRG-EXCEL")
+
 
 if __name__ == "__main__":
     unittest.main()
