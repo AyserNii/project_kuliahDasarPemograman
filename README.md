@@ -98,6 +98,68 @@ python main.py --cli
 
 Jika GUI gagal dibuat atau library grafik GUI tidak tersedia, `main.py` akan mencoba menjalankan mode CLI sebagai alternatif.
 
+## Pemecahan Masalah
+
+### Perintah `py` atau `python` tidak dikenali
+
+Pastikan Python 3.10 atau lebih baru sudah terpasang dan opsi **Add python.exe to PATH** dipilih saat instalasi. Tutup lalu buka kembali PowerShell, kemudian periksa:
+
+```powershell
+py --version
+python --version
+```
+
+### Aktivasi virtual environment ditolak PowerShell
+
+Izinkan skrip hanya untuk sesi PowerShell saat ini, lalu aktifkan kembali:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\.venv\Scripts\Activate.ps1
+```
+
+### Dependency tidak ditemukan saat aplikasi dijalankan
+
+Pastikan virtual environment aktif (biasanya prompt diawali `(.venv)`), lalu pasang ulang dependency:
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+### `python main.py` malah masuk ke CLI
+
+GUI adalah mode bawaan; CLI hanya dipilih jika aplikasi menerima argumen `--cli`. Jalankan dari folder utama proyek tanpa argumen tersebut:
+
+```powershell
+python main.py
+```
+
+Jika CLI tetap terbuka, pastikan PowerShell berada di folder proyek dan file `main.py` yang dijalankan adalah milik proyek ini:
+
+```powershell
+Get-Location
+Resolve-Path .\main.py
+Select-String -Path .\main.py -Pattern '--cli|Gagal membuka antarmuka GUI|Menjalankan dalam mode CLI'
+```
+
+Pada `main.py` proyek ini, kegagalan membuka GUI seharusnya menampilkan pesan `Gagal membuka antarmuka GUI` sebelum mencoba CLI. Jika pesan tersebut tidak muncul, periksa apakah terminal atau konfigurasi Run/Debug VS Code menjalankan file atau versi proyek yang berbeda.
+
+Periksa juga apakah Tkinter tersedia pada interpreter Python yang digunakan:
+
+```powershell
+python -c "import tkinter; print('Tkinter tersedia:', tkinter.TkVersion)"
+```
+
+Jika perintah itu gagal, instal atau ubah instalasi Python di Windows dan pastikan komponen **Tcl/Tk and IDLE** dipilih. Tkinter biasanya disertakan bersama Python dan tidak dipasang melalui `pip`.
+
+### GUI terbuka tetapi menampilkan error database
+
+Pastikan layanan PostgreSQL aktif, database sudah dibuat, dan file `.env` di folder utama berisi `DATABASE_URL` yang sesuai dengan kredensial, port, serta nama database lokal. Setelah konfigurasi siap, jalankan seed satu kali:
+
+```powershell
+python -m database.seed
+```
+
 ## Menjalankan Pengujian
 
 Jalankan seluruh pengujian dengan unittest discovery:

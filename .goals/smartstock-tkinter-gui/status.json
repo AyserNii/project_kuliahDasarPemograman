@@ -1,0 +1,16 @@
+{
+  "goal_id": "smartstock-tkinter-gui",
+  "status": "blocked",
+  "iteration": 1,
+  "builder_model": "runtime-default",
+  "inspector_model": "runtime-default",
+  "initial_sha": "24156eacf03a41143cfe39f61e637d35c04624f4",
+  "created_at": "2026-11-20T08:58:20+07:00",
+  "history": [
+    {
+      "iteration": 1,
+      "verdict": "BLOCKED",
+      "summary": "Both available Goal Builder agent identifiers failed to start because the task runtime returned: 400 The requested model is not supported."
+    }
+  ]
+}
