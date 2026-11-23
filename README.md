@@ -1,4 +1,4 @@
-# SmartStock
+# SmartStock Project
 
 SmartStock adalah aplikasi desktop/CLI untuk pengelolaan persediaan UMKM. Aplikasi menyediakan pengelolaan produk, pemasok, transaksi masuk dan keluar, penjualan, analisis EOQ/ROP/Safety Stock, peramalan permintaan, laporan, serta impor dan ekspor CSV.
 
