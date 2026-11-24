@@ -1,8 +1,9 @@
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
-from math import sqrt
+from math import ceil, sqrt
 from pathlib import Path
 
+from config.settings import HARI_TAHUNAN_BAKU
 from database.connection import buat_koneksi
 
 
@@ -28,8 +29,8 @@ DATA_PENJUALAN = (
 )
 
 MASUKAN_ANALISIS = (
-    ("BRG-001", "2400", "50000", "12000", "8", "2", "5", "1.650"),
-    ("BRG-002", "1800", "75000", "18000", "6", "1.5", "7", "1.650"),
+    ("BRG-001", "2400", "90000", "4500", "2"),
+    ("BRG-002", "1800", "90000", "1800", "2"),
 )
 
 
@@ -41,19 +42,15 @@ def _hitung_hasil_analisis(
     permintaan_tahunan,
     biaya_pemesanan,
     biaya_penyimpanan,
-    rata_rata_permintaan_harian,
-    simpangan_baku_permintaan_harian,
     waktu_tunggu_hari,
-    skor_z,
 ):
     kuantitas_pemesanan_ekonomis = sqrt(
         (2 * float(permintaan_tahunan) * float(biaya_pemesanan)) / float(biaya_penyimpanan)
     )
-    stok_pengaman = (
-        float(skor_z)
-        * float(simpangan_baku_permintaan_harian)
-        * sqrt(float(waktu_tunggu_hari))
+    rata_rata_permintaan_harian = (
+        float(permintaan_tahunan) / HARI_TAHUNAN_BAKU
     )
+    stok_pengaman = ceil(rata_rata_permintaan_harian * float(waktu_tunggu_hari))
     titik_pemesanan_ulang = (
         float(rata_rata_permintaan_harian) * float(waktu_tunggu_hari) + stok_pengaman
     )
@@ -187,6 +184,9 @@ def siapkan_basis_data():
         for sku, *masukan_mentah in MASUKAN_ANALISIS:
             masukan = tuple(_ubah_ke_desimal(nilai) for nilai in masukan_mentah)
             kuantitas_pemesanan_ekonomis, stok_pengaman, titik_pemesanan_ulang = _hitung_hasil_analisis(*masukan)
+            rata_rata_permintaan_harian = (
+                masukan[0] / Decimal(str(HARI_TAHUNAN_BAKU))
+            )
             koneksi.execute(
                 """
                 INSERT INTO inventory_analysis (
@@ -211,7 +211,11 @@ def siapkan_basis_data():
                 (
                     id_produk_berdasarkan_sku[sku],
                     date.today(),
-                    *masukan,
+                    *masukan[:3],
+                    rata_rata_permintaan_harian,
+                    Decimal("0"),
+                    masukan[3],
+                    Decimal("0"),
                     kuantitas_pemesanan_ekonomis,
                     stok_pengaman,
                     titik_pemesanan_ulang,

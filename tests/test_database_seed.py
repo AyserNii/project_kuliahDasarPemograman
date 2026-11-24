@@ -37,14 +37,11 @@ class DatabaseSeedTests(unittest.TestCase):
         self.assertEqual(
             _hitung_hasil_analisis(
                 Decimal("2400"),
-                Decimal("50000"),
-                Decimal("12000"),
-                Decimal("8"),
+                Decimal("90000"),
+                Decimal("4500"),
                 Decimal("2"),
-                Decimal("5"),
-                Decimal("1.650"),
             ),
-            (Decimal("141.42"), Decimal("7.38"), Decimal("47.38")),
+            (Decimal("309.84"), Decimal("16.00"), Decimal("31.38")),
         )
 
 

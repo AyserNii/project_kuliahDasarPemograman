@@ -58,7 +58,7 @@ Sesuai materi perkuliahan Dasar Pemrograman (Pertemuan 7: *Matrix dan Library Pa
 3. **Template Generator (`services/import_service.py`)**:
    - Membuat template CSV contoh menggunakan dictionary yang dikonversi ke DataFrame (`pd.DataFrame(data_dict)`).
 4. **Analisis Deret Waktu & Peramalan (`modules/forecasting.py`)**:
-   - Menggunakan `pd.Series(data).rolling(window=window_size).mean()` untuk menghitung pergerakan rata-rata permintaan penjualan (*moving average*).
+   - Peramalan permintaan tahunan dihitung dengan regresi linear metode Least Squares.
 5. **Penyajian Data Tabel (`modules/report.py`)**:
    - Menyediakan fungsi `ubah_dataframe_ke_tabel_teks(kerangka_data)` untuk memformat DataFrame menjadi representasi teks tabel yang rapi di CLI.
 
@@ -79,7 +79,7 @@ Sesuai materi perkuliahan Dasar Pemrograman (Pertemuan 7: *Matrix dan Library Pa
 - [`config/settings.py`](file:///c:/Users/Resya%20Anggara/project_kuliahDasarPemograman/config/settings.py):
   - Mengatur path absolut ke folder `storage/`, `output/`, dan subdirektorinya.
   - Memastikan folder runtime otomatis dibuat saat program berjalan.
-  - Menyimpan konstanta bisnis default: Hari kerja setahun (365 hari), Biaya Pemesanan default (Rp 50.000), Rasio Biaya Simpan (20%/tahun), Lead Time default (5 hari), dan Z-Score Service Level (1.65).
+  - Menyimpan konstanta bisnis default sesuai jurnal: 26 hari kerja per bulan (312 hari per tahun), biaya pemesanan Rp 90.000, rasio biaya simpan 10%/tahun, dan lead time 2 hari.
 - [`config/database.py`](file:///c:/Users/Resya%20Anggara/project_kuliahDasarPemograman/config/database.py):
   - Membaca environment file `.env` dan menyediakan fungsi `get_database_url()`.
 
@@ -110,7 +110,7 @@ Repository bertanggung jawab mengeksekusi perintah SQL (CRUD) dan mengembalikan 
   - Mencegah stok menjadi minus jika kuantitas `OUT` melebihi stok yang ada.
 - [`sales_repository.py`](file:///c:/Users/Resya%20Anggara/project_kuliahDasarPemograman/repositories/sales_repository.py):
   - Mencatat penjualan baru ke `sales_history` sekaligus membuat transaksi `OUT` dan mengurangi stok produk.
-  - Fungsi `ambil_penjualan_harian()` mengagregasi data penjualan per tanggal untuk kebutuhan perhitungan peramalan permintaan.
+  - Fungsi `ambil_permintaan_tahunan()` mengagregasi penjualan per tahun untuk kebutuhan regresi linear.
 - [`analysis_repository.py`](file:///c:/Users/Resya%20Anggara/project_kuliahDasarPemograman/repositories/analysis_repository.py):
   - Menyimpan hasil optimasi persediaan (`kuantitas_pemesanan_ekonomis`, `stok_pengaman`, `titik_pemesanan_ulang`) ke tabel `inventory_analysis` menggunakan mekanisme `ON CONFLICT DO UPDATE`.
   - Mengambil riwayat analisis terkini untuk masing-masing produk.
@@ -119,17 +119,12 @@ Repository bertanggung jawab mengeksekusi perintah SQL (CRUD) dan mengembalikan 
 - [`inventory.py`](file:///c:/Users/Resya%20Anggara/project_kuliahDasarPemograman/modules/inventory.py):
   - `hitung_kuantitas_pemesanan_ekonomis(permintaan_tahunan, biaya_pemesanan, biaya_penyimpanan_per_unit_tahun)`: Menghitung kuantitas pemesanan ekonomis:
     $$\text{EOQ} = \sqrt{\frac{2 \times D \times S}{H}}$$
-  - `hitung_stok_pengaman(simpangan_baku_permintaan_harian, waktu_tunggu_hari, skor_z)`: Menghitung stok pengaman untuk mengantisipasi ketidakpastian permintaan selama waktu tunggu:
-    $$\text{SS} = Z \times \sigma_d \times \sqrt{L}$$
+  - `hitung_stok_pengaman(pemakaian_harian, waktu_tunggu_hari)`: Menghitung stok pengaman sesuai jurnal, `SS = pemakaian harian × waktu tunggu`, dibulatkan ke atas ke unit utuh.
   - `hitung_titik_pemesanan_ulang(rata_rata_permintaan_harian, waktu_tunggu_hari, stok_pengaman)`: Menghitung titik batas stok untuk memesan kembali:
     $$\text{ROP} = (d \times L) + \text{SS}$$
   - `hitung_biaya_persediaan(...)`: Menghitung biaya simpan tahunan, biaya pesan tahunan, dan total biaya variabel persediaan.
 - [`forecasting.py`](file:///c:/Users/Resya%20Anggara/project_kuliahDasarPemograman/modules/forecasting.py):
-  - `rata_rata_bergerak()`: Peramalan permintaan periode berikutnya berbasis rata-rata bergerak.
-  - `peramalan_rata_rata_bergerak_pandas()`: Menghitung deret rata-rata bergerak menggunakan `pandas.Series.rolling()`.
-  - `rata_rata_bergerak_tertimbang()`: Rata-rata bergerak berbobot.
-  - `pemulusan_eksponensial()`: Pemulusan eksponensial tunggal.
-  - `hitung_statistik_permintaan()`: Menghitung rata-rata permintaan harian, standar deviasi, dan proyeksi permintaan tahunan.
+  - `buat_peramalan_regresi_linear()`: Menghitung garis tren Least Squares dari data permintaan tahunan dan memproyeksikan tiga tahun selanjutnya. Tahun yang tidak memiliki catatan di antara rentang data dihitung 0; permintaan tahun berjalan disetarakan ke estimasi tahunan memakai basis 26 hari kerja per bulan.
 - [`analysis.py`](file:///c:/Users/Resya%20Anggara/project_kuliahDasarPemograman/modules/analysis.py):
   - `tentukan_status_stok()`: Menentukan status kesehatan stok (`HABIS`, `KRITIS`, `PERLU REORDER`, atau `AMAN`).
   - `bandingkan_kebijakan_persediaan()`: Membandingkan total biaya kebijakan pemesanan konvensional vs kebijakan EOQ dan menghitung persentase penghematan biaya.
@@ -152,7 +147,7 @@ Repository bertanggung jawab mengeksekusi perintah SQL (CRUD) dan mengembalikan 
 - [`export_service.py`](file:///c:/Users/Resya%20Anggara/project_kuliahDasarPemograman/services/export_service.py):
   - Mengambil data dari repositori PostgreSQL, membungkusnya ke dalam `pandas.DataFrame`, dan mengekspornya ke CSV di `storage/exports/backups/` atau `storage/exports/reports/`.
 - [`inventory_service.py`](file:///c:/Users/Resya%20Anggara/project_kuliahDasarPemograman/services/inventory_service.py):
-  - Mengatur alur kalkulasi optimasi inventaris: mengambil parameter produk & riwayat penjualan, menghitung statistik demand harian, memanggil modul kalkulasi inventory, dan menyimpan hasilnya ke database `inventory_analysis`.
+  - Mengatur alur kalkulasi optimasi inventaris: mengambil data permintaan tahunan, membuat proyeksi tiga tahun, menghitung EOQ/SS/ROP setiap tahun, lalu menyimpan proyeksi tahun pertama ke `inventory_analysis`.
 
 ### G. Folder `storage/` dan `output/`
 - `storage/imports/`: Tempat meletakkan file CSV yang akan diimpor ke PostgreSQL.
@@ -170,7 +165,25 @@ Repository bertanggung jawab mengeksekusi perintah SQL (CRUD) dan mengembalikan 
 
 ---
 
-## 4. Alur Kerja Fitur-Fitur Utama
+## 4. Rumus Penting per Menu
+
+Rumus yang menghasilkan angka ditampilkan berikut. Menu administratif yang tidak melakukan kalkulasi memiliki keterangan **tidak ada rumus bisnis khusus**.
+
+| Menu / halaman | Rumus atau aturan yang dipakai |
+|---|---|
+| **Dashboard (GUI)** | Total unit = $\sum$ stok. Produk habis jika stok $\leq 0$; perlu reorder jika $0 < \text{stok} \leq \text{stok minimum}$; selain itu aman. |
+| **1. Kelola Produk** | Tidak ada rumus bisnis khusus. Data stok dan harga dicatat; nilai aset stok dihitung di laporan: $\text{stok} \times \text{biaya satuan}$. |
+| **2. Kelola Supplier** | Tidak ada rumus bisnis khusus; menu ini mengelola data pemasok. |
+| **3. Transaksi Persediaan** | Stok baru = stok lama + kuantitas IN; stok baru = stok lama − kuantitas OUT. Transaksi OUT ditolak jika kuantitasnya melebihi stok tersedia. |
+| **4. Riwayat Penjualan** | Total penjualan per transaksi = kuantitas terjual $\times$ harga jual per unit. Stok baru = stok lama − kuantitas terjual; total pendapatan pada halaman penjualan = $\sum$ total transaksi yang dimuat. |
+| **5. Analisis Persediaan** | Demand harian $d = D/312$; biaya simpan per unit per tahun $H = \text{biaya satuan} \times \text{rasio biaya simpan}$. EOQ $Q^* = \sqrt{(2DS)/H}$. Safety Stock $SS = \lceil dL \rceil$. Reorder Point $ROP = (dL)+SS$. Frekuensi pesanan = $D/Q^*$; biaya pesan tahunan = $(D/Q^*)S$; biaya simpan tahunan = $(Q^*/2)H$; total biaya variabel = biaya pesan + biaya simpan. Siklus pemesanan dalam hari kerja = $(Q^*/D)\times312$. Status: HABIS jika stok $\leq0$; KRITIS jika $SS>0$ dan stok $\leq SS$; PERLU REORDER jika stok $\leq ROP$; selainnya AMAN. |
+| **6. Peramalan Permintaan** | Least Squares: $b = \sum((x-\bar{x})(y-\bar{y}))/\sum((x-\bar{x})^2)$; $a = \bar{y}-b\bar{x}$; garis tren $y=a+bx$. $x$ adalah urutan periode tahunan dan $y$ adalah permintaan tahunan. Aplikasi memproyeksikan tiga periode berikutnya. Untuk tahun berjalan, estimasi tahunan = penjualan sampai saat ini $\times 312/\text{hari kerja yang telah berjalan}$, dengan hari kerja berjalan $=(\text{bulan}-1)\times26+\min(\text{tanggal},26)$; sela tahun tanpa catatan diisi 0. |
+| **7. Laporan & Grafik** | Nilai aset stok = $\sum(\text{stok} \times \text{biaya satuan})$; total kuantitas = $\sum \text{stok}$; jumlah produk menipis = hitung produk dengan stok $\leq$ stok minimum. Grafik hanya memvisualisasikan nilai stok/penjualan. |
+| **8. Import & Export CSV** | Tidak ada rumus bisnis khusus; data dibaca, divalidasi, lalu dipindahkan antara CSV dan database. |
+
+Parameter awal analisis mengikuti acuan jurnal: 26 hari kerja/bulan (312 hari/tahun), biaya pesan Rp90.000/order, biaya simpan 10% dari biaya satuan per tahun, dan lead time 2 hari. Nilai dapat berbeda dari tabel jurnal karena aplikasi menghitungnya dari data produk dan penjualan yang tersimpan.
+
+## 5. Alur Kerja Fitur-Fitur Utama
 
 ### A. Alur Pencatatan Transaksi Masuk (IN) & Keluar (OUT)
 1. Pengguna memilih menu **3 (Transaksi Persediaan)** di CLI.
@@ -196,23 +209,34 @@ Repository bertanggung jawab mengeksekusi perintah SQL (CRUD) dan mengembalikan 
 ### C. Alur Perhitungan & Optimasi Inventory (EOQ & ROP)
 1. Pengguna memilih menu **5 (Analisis Persediaan)**.
 2. Pengguna dapat memilih analisis produk tertentu atau *batch analysis* seluruh produk.
-3. `inventory_service.py` mengambil data historis penjualan harian dari `sales_repository`.
-4. `forecasting.py` menghitung rata-rata permintaan harian ($d$) dan standar deviasi permintaan ($\sigma_d$).
+3. `inventory_service.py` mengambil permintaan tahunan per produk dari `sales_repository`.
+4. `forecasting.py` menghitung proyeksi tiga tahun dengan Least Squares (`y = a + bx`). Permintaan harian diperoleh dari proyeksi tahunan dibagi 12 bulan × 26 hari kerja.
 5. `inventory.py` menghitung:
    - $\text{EOQ} = \sqrt{\frac{2 \times D \times S}{H}}$
-   - $\text{Safety Stock} = Z \times \sigma_d \times \sqrt{L}$
+   - $\text{Safety Stock} = \lceil d \times L \rceil$
    - $\text{Reorder Point} = (d \times L) + \text{SS}$
-6. `analysis_repo.save()` menyimpan hasil kalkulasi ke tabel `inventory_analysis`.
+6. Ketiga proyeksi ditampilkan di CLI/GUI; proyeksi tahun pertama disimpan ke tabel `inventory_analysis`.
 7. `analysis.py` mengevaluasi status stok barang saat ini dan mengeluarkan rekomendasi tindakan pemesanan.
 
-### D. Alur Import Data CSV Menggunakan Pandas
+### D. Alur Peramalan Permintaan
+1. Pengguna memilih menu **6 (Peramalan Permintaan)** atau halaman **Peramalan** pada GUI.
+2. `sales_repository` mengambil jumlah penjualan per tahun.
+3. `buat_peramalan_regresi_linear()` menghitung kemiringan ($b$), intersep ($a$), dan nilai ramalan tiga tahun berikutnya.
+4. CLI dan GUI menampilkan persamaan tren serta nilai permintaan tahunan yang sama.
+
+### E. Alur Laporan & Grafik
+1. Pengguna memilih menu **7 (Laporan & Visualisasi Grafik)** atau halaman **Laporan** pada GUI.
+2. Sistem menghitung jumlah unit, nilai aset berdasarkan biaya satuan, dan jumlah produk di/bawah stok minimum.
+3. Ringkasan dapat ditampilkan/disimpan sebagai teks; grafik stok dapat dibuat sebagai ASCII atau PNG.
+
+### F. Alur Import Data CSV Menggunakan Pandas
 1. File CSV diletakkan di folder `storage/imports/` (contoh: `template_products.csv`).
 2. Pengguna memilih menu **8 (Import & Export Data CSV)** -> **Import Produk**.
 3. `import_service.py` membaca file menggunakan `pandas.read_csv()`.
 4. Setiap baris DataFrame divalidasi format SKU, nilai numerik stok, dan harga.
 5. Baris yang valid dimasukkan ke tabel `products` di PostgreSQL, sedangkan baris yang duplikat atau bermasalah dilaporkan ke pengguna tanpa menggagalkan baris lain.
 
-### E. Alur Export Data ke CSV Menggunakan Pandas
+### G. Alur Export Data ke CSV Menggunakan Pandas
 1. Pengguna memilih data yang ingin diekspor (Produk / Transaksi / Penjualan / Hasil Analisis).
 2. Repositori mengambil data dari PostgreSQL.
 3. Data dikonversi ke `pandas.DataFrame`.
@@ -220,7 +244,7 @@ Repository bertanggung jawab mengeksekusi perintah SQL (CRUD) dan mengembalikan 
 
 ---
 
-## 5. Cara Menjalankan Aplikasi dan Testing
+## 6. Cara Menjalankan Aplikasi dan Testing
 
 ### Menjalankan Aplikasi CLI
 Buka terminal dan jalankan:

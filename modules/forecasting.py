@@ -1,121 +1,84 @@
-import statistics
-from typing import Dict, List, Optional
-import pandas as pd
+from datetime import date
+from typing import Any, Dict, List, Optional
+
+from config.settings import HARI_KERJA_PER_BULAN_BAKU, BULAN_PER_TAHUN_BAKU
 
 
-def rata_rata_bergerak(data: List[float], ukuran_jendela: int = 3) -> float:
-    """
-    Menghitung Moving Average untuk peramalan permintaan periode berikutnya.
-    """
-    if not data:
-        return 0.0
-    if ukuran_jendela <= 0:
-        raise ValueError("Ukuran jendela harus lebih besar dari 0")
+def buat_peramalan_regresi_linear(
+    data_tahunan: List[Dict[str, Any]],
+    jumlah_periode: int = 3,
+    tanggal_acuan: Optional[date] = None,
+) -> Dict[str, Any]:
+    """Meramalkan permintaan tahunan dengan metode tren Least Squares."""
+    if jumlah_periode <= 0:
+        raise ValueError("Jumlah periode peramalan harus lebih besar dari 0")
+    if not data_tahunan:
+        raise ValueError("Riwayat permintaan tahunan belum tersedia")
 
-    jendela = [float(nilai) for nilai in data[-ukuran_jendela:]]
-    return round(sum(jendela) / len(jendela), 2)
+    tanggal_acuan = tanggal_acuan or date.today()
+    permintaan_berdasarkan_tahun = {
+        int(baris["tahun"]): float(baris["total_kuantitas"])
+        for baris in data_tahunan
+    }
+    if any(nilai < 0 for nilai in permintaan_berdasarkan_tahun.values()):
+        raise ValueError("Permintaan tahunan tidak boleh negatif")
 
+    tahun_awal = min(permintaan_berdasarkan_tahun)
+    tahun_terakhir = max(max(permintaan_berdasarkan_tahun), tanggal_acuan.year)
+    permintaan_historis = []
+    hari_kerja_per_tahun = HARI_KERJA_PER_BULAN_BAKU * BULAN_PER_TAHUN_BAKU
 
-def peramalan_rata_rata_bergerak_pandas(data: List[float], ukuran_jendela: int = 3) -> List[Optional[float]]:
-    """
-    Menghitung deret Moving Average secara menyeluruh menggunakan Pandas Series.
-    (Materi Penggunaan Pandas DataFrame/Series untuk Analisis Data)
-    """
-    if not data:
-        return []
-    elemen = pd.Series([float(nilai) for nilai in data])
-    hasil_bergulir = elemen.rolling(window=ukuran_jendela).mean()
-    return [
-        round(nilai, 2) if not pd.isna(nilai) else None
-        for nilai in hasil_bergulir
-    ]
+    for tahun in range(tahun_awal, tahun_terakhir + 1):
+        permintaan = permintaan_berdasarkan_tahun.get(tahun, 0.0)
+        if tahun == tanggal_acuan.year:
+            hari_kerja_berjalan = (
+                (tanggal_acuan.month - 1) * HARI_KERJA_PER_BULAN_BAKU
+                + min(tanggal_acuan.day, HARI_KERJA_PER_BULAN_BAKU)
+            )
+            if hari_kerja_berjalan:
+                permintaan *= hari_kerja_per_tahun / hari_kerja_berjalan
 
+        permintaan_historis.append(
+            {"tahun": tahun, "permintaan_tahunan": permintaan}
+        )
 
-def rata_rata_bergerak_tertimbang(data: List[float], bobot: Optional[List[float]] = None) -> float:
-    """
-    Menghitung Weighted Moving Average (WMA).
-    Bobot nilai_default adalah bertingkat dari 1 s.d. n.
-    """
-    if not data:
-        return 0.0
-
-    jumlah = len(data)
-    if bobot is None:
-        bobot = list(range(1, jumlah + 1))
-
-    if len(bobot) != jumlah:
-        raise ValueError("Jumlah bobot harus sama dengan jumlah data")
-
-    total_bobot = sum(bobot)
-    if total_bobot == 0:
-        raise ValueError("Total bobot tidak boleh 0")
-
-    jumlah_tertimbang = sum(
-        float(nilai) * float(bobot_data)
-        for nilai, bobot_data in zip(data, bobot)
+    nilai_y = [baris["permintaan_tahunan"] for baris in permintaan_historis]
+    nilai_x = list(range(1, len(nilai_y) + 1))
+    rata_rata_x = sum(nilai_x) / len(nilai_x)
+    rata_rata_y = sum(nilai_y) / len(nilai_y)
+    penyebut = sum((x - rata_rata_x) ** 2 for x in nilai_x)
+    kemiringan = (
+        sum(
+            (x - rata_rata_x) * (y - rata_rata_y)
+            for x, y in zip(nilai_x, nilai_y)
+        )
+        / penyebut
+        if penyebut
+        else 0.0
     )
-    return round(jumlah_tertimbang / total_bobot, 2)
+    intersep = rata_rata_y - kemiringan * rata_rata_x
 
-
-def pemulusan_eksponensial(data: List[float], alfa: float = 0.3) -> float:
-    """
-    Menghitung Single Exponential Smoothing (SES).
-    - alfa: faktor pembobotan (0 < alfa <= 1)
-    """
-    if not data:
-        return 0.0
-    if not (0 < alfa <= 1):
-        raise ValueError("Alpha harus berada di antara 0 dan 1 (0 < alfa <= 1)")
-
-    peramalan = float(data[0])
-    for nilai_aktual in data[1:]:
-        peramalan = (alfa * float(nilai_aktual)) + ((1 - alfa) * peramalan)
-
-    return round(peramalan, 2)
-
-
-def hitung_statistik_permintaan(kuantitas_harian: List[float]) -> Dict[str, float]:
-    """
-    Menghitung metrik permintaan dari data kuantitas harian:
-    - Rata-rata permintaan harian (rata_rata_permintaan_harian)
-    - Standar deviasi harian (simpangan_baku_permintaan_harian)
-    - Estimasi permintaan tahunan (permintaan_tahunan)
-    """
-    if not kuantitas_harian:
-        return {
-            "rata_rata_permintaan_harian": 0.0,
-            "simpangan_baku_permintaan_harian": 0.0,
-            "permintaan_tahunan": 0.0,
-        }
-
-    daftar_angka = [float(nilai) for nilai in kuantitas_harian]
-    rata_rata = sum(daftar_angka) / len(daftar_angka)
-
-    if len(daftar_angka) > 1:
-        simpangan_baku = statistics.stdev(daftar_angka)
-    else:
-        simpangan_baku = 0.0
-
-    tahunan = rata_rata * 365.0
+    ramalan = []
+    for urutan in range(1, jumlah_periode + 1):
+        x = len(nilai_y) + urutan
+        ramalan.append(
+            {
+                "tahun": tahun_terakhir + urutan,
+                "periode_x": x,
+                "permintaan_tahunan": round(intersep + kemiringan * x, 1),
+            }
+        )
 
     return {
-        "rata_rata_permintaan_harian": round(rata_rata, 2),
-        "simpangan_baku_permintaan_harian": round(simpangan_baku, 2),
-        "permintaan_tahunan": round(tahunan, 2),
-        "rata_rata_harian": round(rata_rata, 2),
-        "standar_deviasi_harian": round(simpangan_baku, 2),
-        "proyeksi_tahunan": round(tahunan, 2),
-        "average_daily_demand": round(rata_rata, 2),
-        "daily_demand_stddev": round(simpangan_baku, 2),
-        "annual_demand": round(tahunan, 2),
+        "historis": [
+            {
+                **baris,
+                "permintaan_tahunan": round(baris["permintaan_tahunan"], 1),
+            }
+            for baris in permintaan_historis
+        ],
+        "intersep": intersep,
+        "kemiringan": kemiringan,
+        "persamaan": f"y = {intersep:.1f} + {kemiringan:.1f}x",
+        "ramalan": ramalan,
     }
-
-
-# Alias kompatibilitas
-moving_average = rata_rata_bergerak
-weighted_moving_average = rata_rata_bergerak_tertimbang
-exponential_smoothing = pemulusan_eksponensial
-hitung_rata_rata_bergerak = rata_rata_bergerak
-peramalan_eksponensial = pemulusan_eksponensial
-calculate_demand_statistics = hitung_statistik_permintaan
-pandas_rolling_forecast = peramalan_rata_rata_bergerak_pandas

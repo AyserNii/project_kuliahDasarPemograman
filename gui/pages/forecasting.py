@@ -19,11 +19,7 @@ from gui.theme import (
 )
 from gui.components.stat_card import StatCard
 from gui.components.chart import BarChart
-from modules.forecasting import (
-    hitung_statistik_permintaan,
-    rata_rata_bergerak,
-    pemulusan_eksponensial,
-)
+from modules.forecasting import buat_peramalan_regresi_linear
 from repositories.product_repository import RepositoriProduk
 from repositories.sales_repository import RepositoriPenjualan
 
@@ -31,9 +27,8 @@ from repositories.sales_repository import RepositoriPenjualan
 class ForecastingPage(tk.Frame):
     """
     Halaman Peramalan Permintaan (Demand Forecasting):
-    - Moving Average (3 & 7 periode)
-    - Single Exponential Smoothing (SES)
-    - Visualisasi deret penjualan aktual vs ramalan
+    - Regresi linear Least Squares untuk proyeksi permintaan tahunan tiga periode
+    - Visualisasi permintaan tahunan hasil peramalan
     """
 
     def __init__(self, parent, **kwargs):
@@ -83,34 +78,34 @@ class ForecastingPage(tk.Frame):
         self.wadah_kartu = tk.Frame(self, bg=BG_MAIN)
         self.wadah_kartu.pack(fill="x", pady=(0, 16))
 
-        self.kartu_rata_rata_3 = StatCard(
+        self.kartu_peramalan_1 = StatCard(
             self.wadah_kartu,
-            title="Moving Avg (3 Periode)",
+            title="Peramalan Tahun ke-1",
             value="-",
-            badge_text="MA-3",
+            badge_text="T+1",
             badge_color=ACCENT_PRIMARY,
         )
-        self.kartu_rata_rata_3.pack(side="left", fill="both", expand=True, padx=(0, 12))
+        self.kartu_peramalan_1.pack(side="left", fill="both", expand=True, padx=(0, 12))
 
-        self.kartu_rata_rata_7 = StatCard(
+        self.kartu_peramalan_2 = StatCard(
             self.wadah_kartu,
-            title="Moving Avg (7 Periode)",
+            title="Peramalan Tahun ke-2",
             value="-",
-            badge_text="MA-7",
+            badge_text="T+2",
             badge_color=ACCENT_SUCCESS,
             badge_bg="#ECFDF5",
         )
-        self.kartu_rata_rata_7.pack(side="left", fill="both", expand=True, padx=(0, 12))
+        self.kartu_peramalan_2.pack(side="left", fill="both", expand=True, padx=(0, 12))
 
-        self.kartu_pemulusan_eksponensial = StatCard(
+        self.kartu_peramalan_3 = StatCard(
             self.wadah_kartu,
-            title="Exp. Smoothing (α=0.3)",
+            title="Peramalan Tahun ke-3",
             value="-",
-            badge_text="SES",
+            badge_text="T+3",
             badge_color=ACCENT_WARNING,
             badge_bg="#FFFBEB",
         )
-        self.kartu_pemulusan_eksponensial.pack(side="left", fill="both", expand=True)
+        self.kartu_peramalan_3.pack(side="left", fill="both", expand=True)
 
         # 3. Baris Ringkasan Statistik Permintaan
         self.wadah_statistik = tk.Frame(
@@ -125,7 +120,7 @@ class ForecastingPage(tk.Frame):
 
         self.label_statistik = tk.Label(
             self.wadah_statistik,
-            text="Pilih produk di atas untuk melihat ringkasan historis permintaan harian.",
+            text="Pilih produk di atas untuk melihat tren permintaan dan proyeksi tahunan.",
             font=FONT_BODY,
             fg=TEXT_SECONDARY,
             bg=BG_CARD,
@@ -137,7 +132,7 @@ class ForecastingPage(tk.Frame):
         # 4. Grafik Penjualan Historis
         self.grafik = BarChart(
             self,
-            title="Riwayat Volume Penjualan Aktual (Unit)",
+            title="Peramalan Permintaan Tahunan (Unit)",
             width=800,
             height=200,
         )
@@ -165,39 +160,41 @@ class ForecastingPage(tk.Frame):
         produk = self.daftar_produk[indeks]
         id_produk = produk["id_produk"]
 
-        penjualan_harian = self.repositori_penjualan.ambil_penjualan_harian(id_produk, hari=90)
-        if not penjualan_harian:
-            self.kartu_rata_rata_3.perbarui_nilai("0 unit")
-            self.kartu_rata_rata_7.perbarui_nilai("0 unit")
-            self.kartu_pemulusan_eksponensial.perbarui_nilai("0 unit")
+        penjualan_tahunan = self.repositori_penjualan.ambil_permintaan_tahunan(id_produk)
+        if not penjualan_tahunan:
+            self.kartu_peramalan_1.perbarui_nilai("-")
+            self.kartu_peramalan_2.perbarui_nilai("-")
+            self.kartu_peramalan_3.perbarui_nilai("-")
             self.label_statistik.config(
-                text=f"Produk '{produk['nama']}' belum memiliki riwayat penjualan dalam 90 hari terakhir.\n"
-                f"Catat penjualan baru di menu Penjualan untuk mengaktifkan model peramalan otomatis."
+                text=f"Produk '{produk['nama']}' belum memiliki riwayat penjualan.\n"
+                "Catat penjualan untuk mengaktifkan peramalan regresi tahunan."
             )
             self.grafik.atur_data([], [])
             return
 
-        daftar_kuantitas = [float(baris["total_kuantitas"]) for baris in penjualan_harian]
-        stats = hitung_statistik_permintaan(daftar_kuantitas)
-
-        rata_rata_3 = rata_rata_bergerak(daftar_kuantitas, ukuran_jendela=3)
-        rata_rata_7 = rata_rata_bergerak(daftar_kuantitas, ukuran_jendela=7)
-        nilai_pemulusan = pemulusan_eksponensial(daftar_kuantitas, alfa=0.3)
-
-        self.kartu_rata_rata_3.perbarui_nilai(f"{rata_rata_3:.2f} unit/hari")
-        self.kartu_rata_rata_7.perbarui_nilai(f"{rata_rata_7:.2f} unit/hari")
-        self.kartu_pemulusan_eksponensial.perbarui_nilai(f"{nilai_pemulusan:.2f} unit/hari")
+        hasil_peramalan = buat_peramalan_regresi_linear(penjualan_tahunan)
+        kartu_peramalan = (
+            self.kartu_peramalan_1,
+            self.kartu_peramalan_2,
+            self.kartu_peramalan_3,
+        )
+        for kartu, ramalan in zip(kartu_peramalan, hasil_peramalan["ramalan"]):
+            kartu.perbarui_nilai(
+                f"{ramalan['permintaan_tahunan']:,.1f} unit/tahun",
+                new_badge=str(ramalan["tahun"]),
+            )
 
         teks_ringkasan = (
-            f"Statistik Permintaan untuk {produk['nama']} (SKU: {produk['sku']}):\n"
-            f"• Jumlah Hari Transaksi: {len(daftar_kuantitas)} hari\n"
-            f"• Rata-rata Penjualan Harian: {stats['rata_rata_harian']:.2f} unit/hari\n"
-            f"• Standar Deviasi Permintaan: {stats['standar_deviasi_harian']:.2f}\n"
-            f"• Estimasi Permintaan Tahunan: {stats['proyeksi_tahunan']:,.0f} unit/tahun"
+            f"Regresi Least Squares untuk {produk['nama']} (SKU: {produk['sku']}):\n"
+            f"• Periode historis: {len(hasil_peramalan['historis'])} tahun\n"
+            f"• Garis regresi: {hasil_peramalan['persamaan']}\n"
+            "• Permintaan tahunan diproyeksikan untuk tiga tahun berikutnya."
         )
         self.label_statistik.config(text=teks_ringkasan)
 
-        # Update Grafik
-        tanggal_grafik = [str(baris["hari_penjualan"])[5:] for baris in penjualan_harian[-10:]]
-        nilai_grafik = [float(baris["total_kuantitas"]) for baris in penjualan_harian[-10:]]
-        self.grafik.atur_data(tanggal_grafik, nilai_grafik)
+        label_grafik = [str(baris["tahun"]) for baris in hasil_peramalan["ramalan"]]
+        nilai_grafik = [
+            float(baris["permintaan_tahunan"])
+            for baris in hasil_peramalan["ramalan"]
+        ]
+        self.grafik.atur_data(label_grafik, nilai_grafik)

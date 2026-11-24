@@ -6,10 +6,7 @@ from modules.inventory import (
     analisis_item_persediaan,
 )
 from modules.forecasting import (
-    rata_rata_bergerak,
-    rata_rata_bergerak_tertimbang,
-    pemulusan_eksponensial,
-    hitung_statistik_permintaan,
+    buat_peramalan_regresi_linear,
 )
 from modules.analysis import (
     tentukan_status_stok,
@@ -38,10 +35,7 @@ __all__ = [
     "hitung_titik_pemesanan_ulang",
     "hitung_biaya_persediaan",
     "analisis_item_persediaan",
-    "rata_rata_bergerak",
-    "rata_rata_bergerak_tertimbang",
-    "pemulusan_eksponensial",
-    "hitung_statistik_permintaan",
+    "buat_peramalan_regresi_linear",
     "tentukan_status_stok",
     "bandingkan_kebijakan_persediaan",
     "buat_rekomendasi",

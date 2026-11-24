@@ -1,0 +1,16 @@
+============================================================
+             RINGKASAN STATUS INVENTARIS
+        Waktu Pembuatan: 2026-11-24 09:34:29
+============================================================
+Total Jenis Produk      : 5
+Total Kuantitas Fisik   : 315.00 unit
+Total Nilai Aset Stok   : Rp 23,403,000.00
+Jumlah Produk Menipis   : 1 item
+------------------------------------------------------------
+
+[PERINGATAN] Produk yang Mencapai/Di Bawah Batas Minimum:
++---------+-------------+---------------+-----------+
+| SKU     | Nama Produk | Stok Saat Ini | Min. Stok |
++---------+-------------+---------------+-----------+
+| BRG-005 | CocaCola    | 5.00          | 9.00      |
++---------+-------------+---------------+-----------+

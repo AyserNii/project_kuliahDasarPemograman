@@ -2,6 +2,25 @@
 
 SmartStock adalah aplikasi desktop/CLI untuk pengelolaan persediaan UMKM. Aplikasi menyediakan pengelolaan produk, pemasok, transaksi masuk dan keluar, penjualan, analisis EOQ/ROP/Safety Stock, peramalan permintaan, laporan, serta impor dan ekspor CSV.
 
+## Metode Peramalan dan Persediaan
+
+Peramalan CLI dan GUI menggunakan regresi linear metode Least Squares atas permintaan tahunan, lalu menampilkan proyeksi tiga tahun:
+
+```text
+y = a + bx
+b = Σ((x - x̄)(y - ȳ)) / Σ((x - x̄)²)
+a = ȳ - b x̄
+```
+
+Perhitungan persediaan mengikuti rumus dan basis hari kerja pada jurnal acuan:
+
+- Permintaan harian: `d = D / (12 × 26)`.
+- EOQ: `Q* = √((2 × D × S) / H)`.
+- Safety stock: `SS = d × L`, dibulatkan ke atas ke unit utuh.
+- Reorder point: `ROP = (d × L) + SS`.
+
+Nilai awal parameter: 26 hari kerja per bulan, lead time 2 hari, biaya pesan Rp90.000/order, dan biaya simpan 10% dari biaya satuan per tahun. Data tahun berjalan disetarakan ke estimasi tahunan berdasarkan hari kerja yang sudah berlalu; tahun yang tidak memiliki catatan di antara rentang data diisi nol. Hasil dihitung dari data aplikasi, bukan angka contoh jurnal yang ditanam.
+
 ## Teknologi yang Digunakan
 
 | Teknologi | Kegunaan |
@@ -199,7 +218,7 @@ tests/                      # Pengujian unittest
 - Transaksi barang masuk dan keluar.
 - Pencatatan penjualan dengan pembaruan stok.
 - Perhitungan EOQ, Safety Stock, dan Reorder Point.
-- Moving Average dan Exponential Smoothing.
+- Regresi linear Least Squares dan proyeksi permintaan tahunan tiga periode.
 - Laporan inventaris dan grafik stok.
 - Template serta impor/ekspor CSV melalui Pandas.
 

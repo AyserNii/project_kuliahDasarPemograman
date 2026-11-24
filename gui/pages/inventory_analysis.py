@@ -1,6 +1,7 @@
+import math
 import tkinter as tk
 from tkinter import ttk, messagebox
-from typing import Any, Dict
+from typing import Any, Dict, List
 from gui.theme import (
     BG_CARD,
     BG_MAIN,
@@ -20,6 +21,8 @@ from gui.theme import (
     ACCENT_DANGER,
 )
 from gui.components.data_table import DataTable
+from config.settings import HARI_TAHUNAN_BAKU
+from modules.analysis import tentukan_status_stok
 from repositories.analysis_repository import RepositoriAnalisis
 from repositories.product_repository import RepositoriProduk
 from repositories.sales_repository import RepositoriPenjualan
@@ -39,6 +42,7 @@ class InventoryAnalysisPage(tk.Frame):
         self.repositori_penjualan = RepositoriPenjualan()
         self.repositori_analisis = RepositoriAnalisis()
         self.layanan_persediaan = LayananPersediaan(self.repositori_produk, self.repositori_penjualan, self.repositori_analisis)
+        self.proyeksi_per_produk: Dict[int, List[Dict[str, Any]]] = {}
 
         self._bangun_tampilan()
         self.muat_ulang()
@@ -136,19 +140,18 @@ class InventoryAnalysisPage(tk.Frame):
                 titik_pemesanan_ulang = float(a.get("titik_pemesanan_ulang", 0))
                 stok_pengaman = float(a.get("stok_pengaman", 0))
 
-                if stok <= 0:
-                    status = "HABIS"
-                elif stok <= titik_pemesanan_ulang:
-                    status = "PERLU REORDER"
-                else:
-                    status = "AMAN"
+                status = tentukan_status_stok(
+                    stok,
+                    titik_pemesanan_ulang,
+                    stok_pengaman,
+                )
 
                 data_terformat.append({
                     "sku": a.get("sku", "-"),
                     "nama_produk": a.get("nama_produk", "-"),
                     "stok": f"{stok:.1f}",
-                    "permintaan_tahunan": f"{float(a['permintaan_tahunan']):,.0f}",
-                    "eoq": f"{float(a['kuantitas_pemesanan_ekonomis']):.0f}",
+                    "permintaan_tahunan": f"{float(a['permintaan_tahunan']):,.1f}",
+                    "eoq": f"{float(a['kuantitas_pemesanan_ekonomis']):.2f}",
                     "safety_stock": f"{stok_pengaman:.1f}",
                     "reorder_point": f"{titik_pemesanan_ulang:.1f}",
                     "status": status,
@@ -162,12 +165,29 @@ class InventoryAnalysisPage(tk.Frame):
     def _jalankan_analisis_massal(self):
         try:
             daftar_hasil = self.layanan_persediaan.analisis_semua_produk()
+            self.proyeksi_per_produk = {
+                hasil["produk"]["id_produk"]: hasil["proyeksi"]
+                for hasil in daftar_hasil
+                if "kesalahan" not in hasil
+            }
             self.muat_ulang()
-            messagebox.showinfo(
-                "Analisis Berhasil",
-                f"Selesai menjalankan perhitungan optimasi inventaris untuk {len(daftar_hasil)} produk!",
-                parent=self,
+            kesalahan = [
+                f"{hasil['produk']['nama']}: {hasil['kesalahan']}"
+                for hasil in daftar_hasil
+                if "kesalahan" in hasil
+            ]
+            pesan = (
+                f"Berhasil: {len(daftar_hasil) - len(kesalahan)} produk\n"
+                f"Gagal: {len(kesalahan)} produk"
             )
+            if kesalahan:
+                messagebox.showwarning(
+                    "Analisis Selesai dengan Kesalahan",
+                    pesan + "\n\n" + "\n".join(kesalahan[:5]),
+                    parent=self,
+                )
+            else:
+                messagebox.showinfo("Analisis Berhasil", pesan, parent=self)
         except Exception as kesalahan:
             messagebox.showerror("Gagal Menjalankan Analisis", str(kesalahan), parent=self)
 
@@ -185,20 +205,34 @@ class InventoryAnalysisPage(tk.Frame):
         biaya_penyimpanan = float(a.get("biaya_penyimpanan_per_unit_tahun", 0))
 
         jumlah_pemesanan = d / kuantitas_pemesanan_ekonomis if kuantitas_pemesanan_ekonomis > 0 else 0
-        hari_siklus = (kuantitas_pemesanan_ekonomis / d * 365) if d > 0 else 0
+        hari_siklus = (
+            kuantitas_pemesanan_ekonomis / d * HARI_TAHUNAN_BAKU
+            if d > 0
+            else 0
+        )
 
         self.label_judul_rincian.config(
             text=f"Rincian Analisis: {a['nama_produk']} (SKU: {a['sku']}) | Status: [{baris['status']}]"
         )
 
+        daftar_proyeksi = self.proyeksi_per_produk.get(a.get("id_produk"), [])
+        teks_proyeksi = "\n".join(
+            f"• {baris['tahun']}: Permintaan {baris['permintaan_tahunan']:,.1f} unit/tahun"
+            f" | EOQ {baris['kuantitas_pemesanan_ekonomis']:,.2f}"
+            f" | Frekuensi {baris['jumlah_pemesanan_per_tahun']:,.2f}/tahun"
+            f" | SS {baris['stok_pengaman']:,.0f}"
+            f" | ROP {baris['titik_pemesanan_ulang']:,.1f}"
+            for baris in daftar_proyeksi
+        )
         detail_text = (
-            f"• Kuantitas Pesan Ekonomis (EOQ): {kuantitas_pemesanan_ekonomis:.0f} unit per order\n"
+            (f"Proyeksi tiga tahun:\n{teks_proyeksi}\n" if teks_proyeksi else "")
+            + f"• Kuantitas Pesan Ekonomis (EOQ): {kuantitas_pemesanan_ekonomis:.2f} unit per order\n"
             f"• Persediaan Pengaman (Safety Stock): {stok_pengaman:.1f} unit  |  Titik Pemesanan Kembali (ROP): {titik_pemesanan_ulang:.1f} unit\n"
             f"• Frekuensi Pemesanan: ~{jumlah_pemesanan:.1f} kali/tahun  (setiap ~{hari_siklus:.0f} hari)\n"
             f"• Biaya Pemesanan: Rp {biaya_pemesanan:,.0f}/order  |  Biaya Simpan: Rp {biaya_penyimpanan:,.0f}/unit/tahun\n"
             f"• Rekomendasi Tindakan: "
             + (
-                f"Lakukan pemesanan ulang segera sebesar {kuantitas_pemesanan_ekonomis:.0f} unit!"
+                f"Lakukan pemesanan ulang segera sebesar {math.ceil(kuantitas_pemesanan_ekonomis)} unit!"
                 if stok <= titik_pemesanan_ulang
                 else "Stok dalam batas aman. Pertahankan tingkat persediaan."
             )

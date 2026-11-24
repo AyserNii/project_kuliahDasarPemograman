@@ -150,3 +150,21 @@ class RepositoriPenjualan:
                     (id_produk, hari),
                 )
                 return kursor.fetchall()
+
+    def ambil_permintaan_tahunan(self, id_produk: int) -> List[Dict[str, Any]]:
+        """Mengambil total permintaan tahunan untuk model regresi tren."""
+        with self._ambil_koneksi() as koneksi:
+            with koneksi.cursor(row_factory=dict_row) as kursor:
+                kursor.execute(
+                    """
+                    SELECT EXTRACT(YEAR FROM tanggal_penjualan)::integer AS tahun,
+                           SUM(kuantitas_terjual) AS total_kuantitas
+                    FROM sales_history
+                    WHERE id_produk = %s
+                      AND tanggal_penjualan < DATE_TRUNC('year', CURRENT_DATE) + INTERVAL '1 year'
+                    GROUP BY EXTRACT(YEAR FROM tanggal_penjualan)
+                    ORDER BY tahun ASC
+                    """,
+                    (id_produk,),
+                )
+                return kursor.fetchall()

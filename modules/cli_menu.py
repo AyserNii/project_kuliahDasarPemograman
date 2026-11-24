@@ -1,9 +1,14 @@
 from datetime import datetime
 
-from config.settings import DIREKTORI_IMPOR
+from config.settings import (
+    BIAYA_PEMESANAN_BAKU,
+    DIREKTORI_IMPOR,
+    RASIO_BIAYA_PENYIMPANAN_BAKU,
+    WAKTU_TUNGGU_HARI_BAKU,
+)
 from modules.analysis import tentukan_status_stok
 from psycopg.errors import ForeignKeyViolation
-from modules.forecasting import hitung_statistik_permintaan, pemulusan_eksponensial, rata_rata_bergerak
+from modules.forecasting import buat_peramalan_regresi_linear
 from modules.report import (
     grafik_batang_ascii,
     format_tabel,
@@ -513,11 +518,18 @@ class AntarmukaSmartStockCLI:
             return
 
         print(f"\nParameter Optimasi untuk: {produk['nama']}")
-        biaya_pemesanan = minta_angka("Biaya Pemesanan per Order (Rp) [S]", 50000.0)
-        waktu_tunggu = minta_angka("Waktu Tunggu Pengiriman/Lead Time (hari) [L]", 5.0)
-        rasio_biaya_simpan = minta_angka("Tarif Biaya Simpan per Tahun (% dari harga barang)", 20.0) / 100.0
-        nilai_z = minta_angka("Z-score Tingkat Pelayanan (1.65 = ~95% service level)", 1.65)
-        permintaan_manual = minta_angka("Permintaan Tahunan (D) - Kosongkan/0 untuk hitung otomatis dari penjualan", 0.0)
+        biaya_pemesanan = minta_angka(
+            "Biaya Pemesanan per Order (Rp) [S]",
+            BIAYA_PEMESANAN_BAKU,
+        )
+        waktu_tunggu = minta_angka(
+            "Waktu Tunggu Pengiriman/Lead Time (hari) [L]",
+            WAKTU_TUNGGU_HARI_BAKU,
+        )
+        rasio_biaya_simpan = minta_angka(
+            "Tarif Biaya Simpan per Tahun (% dari harga barang)",
+            RASIO_BIAYA_PENYIMPANAN_BAKU * 100,
+        ) / 100.0
 
         try:
             hasil = self.layanan_persediaan.analisis_produk(
@@ -525,60 +537,32 @@ class AntarmukaSmartStockCLI:
                 biaya_pemesanan=biaya_pemesanan,
                 rasio_biaya_penyimpanan=rasio_biaya_simpan,
                 waktu_tunggu_hari=waktu_tunggu,
-                skor_z=nilai_z,
-                permintaan_tahunan_manual=permintaan_manual if permintaan_manual > 0 else None,
             )
 
-            entri = hasil["analisis"]
             rekomendasi = hasil["rekomendasi"]
-            biaya = hasil["biaya"]
-
-            judul_kolom = ["Indikator", "Nilai"]
+            judul_kolom = [
+                "Tahun",
+                "Permintaan Tahunan (D)",
+                "Kuantitas Pesan Ekonomis (EOQ)",
+                "Frekuensi",
+                "Stok Pengaman (SS)",
+                "Titik Pemesanan Ulang (ROP)",
+            ]
             baris_data = [
-                ["Produk", f"{produk['nama']} (SKU: {produk['sku']})"],
                 [
-                    "Permintaan Tahunan (D)",
-                    f"{float(entri['permintaan_tahunan']):,.2f} unit/tahun",
-                ],
-                [
-                    "Biaya Pemesanan (S)",
-                    f"Rp {float(entri['biaya_pemesanan']):,.2f}",
-                ],
-                [
-                    "Biaya Simpan per Unit per Tahun (H)",
-                    f"Rp {float(entri['biaya_penyimpanan_per_unit_tahun']):,.2f}",
-                ],
-                [
-                    "Kuantitas Pesan Ekonomis (EOQ)",
-                    f"{float(entri['kuantitas_pemesanan_ekonomis']):,.2f} unit",
-                ],
-                [
-                    "Stok Pengaman (SS)",
-                    f"{float(entri['stok_pengaman']):,.2f} unit",
-                ],
-                [
-                    "Titik Pemesanan Ulang (ROP)",
-                    f"{float(entri['titik_pemesanan_ulang']):,.2f} unit",
-                ],
-                [
-                    "Frekuensi Pemesanan",
-                    f"{biaya['jumlah_pemesanan_per_tahun']} kali/tahun",
-                ],
-                [
-                    "Siklus Pemesanan",
-                    f"Setiap sekitar {biaya['hari_siklus_pemesanan']} hari",
-                ],
-                [
-                    "Total Biaya Persediaan per Tahun",
-                    f"Rp {biaya['total_biaya']:,.2f}",
-                ],
-                [
-                    "Status Stok",
-                    f"{rekomendasi['status']} (stok fisik: {rekomendasi['stok_saat_ini']:.2f})",
-                ],
+                    str(proyeksi["tahun"]),
+                    f"{proyeksi['permintaan_tahunan']:,.1f}",
+                    f"{proyeksi['kuantitas_pemesanan_ekonomis']:,.2f}",
+                    f"{proyeksi['jumlah_pemesanan_per_tahun']:,.2f}",
+                    f"{proyeksi['stok_pengaman']:,.0f}",
+                    f"{proyeksi['titik_pemesanan_ulang']:,.1f}",
+                ]
+                for proyeksi in hasil["proyeksi"]
             ]
             print("\nHASIL ANALISIS PERSEDIAAN")
             print(format_tabel(judul_kolom, baris_data))
+            print(f"\nProduk: {produk['nama']} (SKU: {produk['sku']})")
+            print(f"Garis regresi permintaan: {hasil['peramalan']['persamaan']}")
             print(f"\nRekomendasi: {rekomendasi['tindakan']}")
             print("[Info] Hasil analisis berhasil disimpan ke tabel inventory_analysis.")
         except Exception as kesalahan:
@@ -588,8 +572,38 @@ class AntarmukaSmartStockCLI:
         print("\nMenjalankan analisis otomatis untuk seluruh produk...")
         daftar_hasil = self.layanan_persediaan.analisis_semua_produk()
         jumlah_berhasil = sum(1 for hasil in daftar_hasil if "kesalahan" not in hasil)
-        print(f"\n[SUKSES] Selesai menganalisis {jumlah_berhasil} dari {len(daftar_hasil)} produk.")
-        self.tampilkan_analisis_terbaru()
+        print(
+            f"\n[HASIL] Berhasil menganalisis {jumlah_berhasil} "
+            f"dari {len(daftar_hasil)} produk."
+        )
+        for hasil in daftar_hasil:
+            produk = hasil["produk"]
+            if "kesalahan" in hasil:
+                print(f"\n[Gagal] {produk['nama']}: {hasil['kesalahan']}")
+                continue
+
+            print(f"\n{produk['nama']} (SKU: {produk['sku']})")
+            print(f"Garis regresi permintaan: {hasil['peramalan']['persamaan']}")
+            judul_kolom = [
+                "Tahun",
+                "Permintaan Tahunan (D)",
+                "Kuantitas Pesan Ekonomis (EOQ)",
+                "Frekuensi",
+                "Stok Pengaman (SS)",
+                "Titik Pemesanan Ulang (ROP)",
+            ]
+            baris_data = [
+                [
+                    str(proyeksi["tahun"]),
+                    f"{proyeksi['permintaan_tahunan']:,.1f}",
+                    f"{proyeksi['kuantitas_pemesanan_ekonomis']:,.2f}",
+                    f"{proyeksi['jumlah_pemesanan_per_tahun']:,.2f}",
+                    f"{proyeksi['stok_pengaman']:,.0f}",
+                    f"{proyeksi['titik_pemesanan_ulang']:,.1f}",
+                ]
+                for proyeksi in hasil["proyeksi"]
+            ]
+            print(format_tabel(judul_kolom, baris_data))
 
     def tampilkan_analisis_terbaru(self):
         daftar_analisis = self.repositori_analisis.ambil_semua_terbaru()
@@ -631,41 +645,33 @@ class AntarmukaSmartStockCLI:
             print("Produk tidak ditemukan.")
             return
 
-        penjualan_harian = self.repositori_penjualan.ambil_penjualan_harian(produk["id_produk"], hari=90)
-        if not penjualan_harian:
-            print(f"\nBelum ada riwayat penjualan untuk produk '{produk['nama']}' dalam 90 hari terakhir.")
-            print("Peramalan memerlukan data riwayat penjualan (Menu 4).")
+        penjualan_tahunan = self.repositori_penjualan.ambil_permintaan_tahunan(produk["id_produk"])
+        if not penjualan_tahunan:
+            print(f"\nBelum ada riwayat penjualan untuk produk '{produk['nama']}'.")
+            print("Peramalan regresi memerlukan minimal satu periode data tahunan.")
             return
 
-        riwayat_kuantitas = [float(baris["total_kuantitas"]) for baris in penjualan_harian]
-        statistik = hitung_statistik_permintaan(riwayat_kuantitas)
-
-        rata_rata_3 = rata_rata_bergerak(riwayat_kuantitas, ukuran_jendela=3)
-        rata_rata_7 = rata_rata_bergerak(riwayat_kuantitas, ukuran_jendela=7)
-        pemulusan = pemulusan_eksponensial(riwayat_kuantitas, alfa=0.3)
+        hasil_peramalan = buat_peramalan_regresi_linear(penjualan_tahunan)
 
         judul_kolom = ["Indikator", "Nilai"]
         baris_data = [
-            ["Produk", produk["nama"]],
-            ["Hari dengan Penjualan", f"{len(riwayat_kuantitas)} hari"],
             [
-                "Rata-rata Permintaan Harian",
-                f"{statistik['rata_rata_permintaan_harian']:.2f} unit/hari",
-            ],
-            [
-                "Simpangan Baku Permintaan",
-                f"{statistik['simpangan_baku_permintaan_harian']:.2f}",
-            ],
-            [
-                "Proyeksi Permintaan Tahunan",
-                f"{statistik['permintaan_tahunan']:,.2f} unit/tahun",
-            ],
-            ["Rata-rata Bergerak (3 periode)", f"{rata_rata_3:.2f} unit/hari"],
-            ["Rata-rata Bergerak (7 periode)", f"{rata_rata_7:.2f} unit/hari"],
-            ["Pemulusan Eksponensial (alfa 0.3)", f"{pemulusan:.2f} unit/hari"],
+                f"Permintaan Historis {baris['tahun']}",
+                f"{baris['permintaan_tahunan']:,.1f} unit/tahun",
+            ]
+            for baris in hasil_peramalan["historis"]
         ]
+        baris_data.extend(
+            [
+                f"Peramalan {baris['tahun']}",
+                f"{baris['permintaan_tahunan']:,.1f} unit/tahun",
+            ]
+            for baris in hasil_peramalan["ramalan"]
+        )
         print("\nHASIL PERAMALAN PERMINTAAN")
         print(format_tabel(judul_kolom, baris_data))
+        print(f"\nMetode: Least Squares (regresi linear)")
+        print(f"Garis regresi: {hasil_peramalan['persamaan']}")
 
     # ==================== 7. LAPORAN & GRAFIK ====================
     def menu_laporan(self):

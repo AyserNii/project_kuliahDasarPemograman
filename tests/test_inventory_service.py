@@ -1,4 +1,8 @@
 import unittest
+from datetime import date
+import math
+
+from config.settings import HARI_TAHUNAN_BAKU
 
 from services.inventory_service import LayananPersediaan
 
@@ -18,8 +22,12 @@ class RepositoriProdukPalsu:
 
 
 class RepositoriPenjualanPalsu:
-    def ambil_penjualan_harian(self, id_produk, hari):
-        return []
+    def ambil_permintaan_tahunan(self, id_produk):
+        tahun_ini = date.today().year
+        return [
+            {"tahun": tahun_ini - 1, "total_kuantitas": 1000},
+            {"tahun": tahun_ini, "total_kuantitas": 1500},
+        ]
 
 
 class RepositoriAnalisisPalsu:
@@ -40,14 +48,27 @@ class TestLayananPersediaan(unittest.TestCase):
 
         hasil = layanan.analisis_produk(
             id_produk=1,
-            permintaan_tahunan_manual=120,
         )
 
         self.assertIn("produk", hasil)
         self.assertIn("analisis", hasil)
         self.assertIn("rekomendasi", hasil)
         self.assertIn("biaya", hasil)
+        self.assertIn("peramalan", hasil)
+        self.assertEqual(len(hasil["proyeksi"]), 3)
         self.assertIn("kuantitas_pemesanan_ekonomis", hasil["analisis"])
+        proyeksi_pertama = hasil["proyeksi"][0]
+        pemakaian_harian = (
+            proyeksi_pertama["permintaan_tahunan"] / HARI_TAHUNAN_BAKU
+        )
+        self.assertEqual(
+            proyeksi_pertama["stok_pengaman"],
+            math.ceil(pemakaian_harian * 2),
+        )
+        self.assertEqual(
+            proyeksi_pertama["titik_pemesanan_ulang"],
+            round(pemakaian_harian * 2 + proyeksi_pertama["stok_pengaman"], 2),
+        )
 
 
 if __name__ == "__main__":

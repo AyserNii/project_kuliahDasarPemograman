@@ -259,23 +259,45 @@ class TestGUINavigationAndPages(unittest.TestCase):
             pilihan_produk=MagicMock(),
             daftar_produk=[{"id_produk": 7, "sku": "BRG-1", "nama": "Produk"}],
             repositori_penjualan=MagicMock(),
-            kartu_rata_rata_3=MagicMock(),
-            kartu_rata_rata_7=MagicMock(),
-            kartu_pemulusan_eksponensial=MagicMock(),
+            kartu_peramalan_1=MagicMock(),
+            kartu_peramalan_2=MagicMock(),
+            kartu_peramalan_3=MagicMock(),
             label_statistik=MagicMock(),
             grafik=MagicMock(),
         )
         halaman.pilihan_produk.current.return_value = 0
-        halaman.repositori_penjualan.ambil_penjualan_harian.return_value = [
-            {"total_kuantitas": 2, "hari_penjualan": "2026-11-20"}
+        halaman.repositori_penjualan.ambil_permintaan_tahunan.return_value = [
+            {"tahun": 2025, "total_kuantitas": 20},
+            {"tahun": 2026, "total_kuantitas": 30},
         ]
 
         ForecastingPage._hitung_peramalan(halaman)
 
-        halaman.repositori_penjualan.ambil_penjualan_harian.assert_called_once_with(7, hari=90)
-        halaman.kartu_rata_rata_3.perbarui_nilai.assert_called_once_with("2.00 unit/hari")
-        halaman.kartu_rata_rata_7.perbarui_nilai.assert_called_once_with("2.00 unit/hari")
+        halaman.repositori_penjualan.ambil_permintaan_tahunan.assert_called_once_with(7)
+        halaman.kartu_peramalan_1.perbarui_nilai.assert_called_once()
+        halaman.kartu_peramalan_2.perbarui_nilai.assert_called_once()
+        halaman.kartu_peramalan_3.perbarui_nilai.assert_called_once()
+        halaman.grafik.atur_data.assert_called_once()
 
+    def test_inventory_report_export_uses_supported_filename_argument(self):
+        halaman = SimpleNamespace(
+            repositori_produk=MagicMock(),
+        )
+        halaman.repositori_produk.ambil_semua.return_value = []
+
+        with patch(
+            "gui.pages.reports.hasilkan_laporan_ringkasan_inventaris",
+            return_value="laporan",
+        ), patch(
+            "gui.pages.reports.simpan_laporan_teks",
+            return_value="laporan.txt",
+        ) as simpan_laporan, patch("gui.pages.reports.messagebox.showinfo"):
+            ReportsPage._ekspor_laporan_teks(halaman)
+
+        simpan_laporan.assert_called_once_with(
+            "laporan",
+            awalan_nama_berkas="laporan_inventaris",
+        )
 
 
 if __name__ == "__main__":

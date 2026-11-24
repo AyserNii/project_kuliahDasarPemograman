@@ -3,12 +3,12 @@ from typing import Any, Dict, List, Optional
 
 from config.settings import (
     BIAYA_PEMESANAN_BAKU,
+    HARI_TAHUNAN_BAKU,
     RASIO_BIAYA_PENYIMPANAN_BAKU,
-    SKOR_Z_TINGKAT_LAYANAN_BAKU,
     WAKTU_TUNGGU_HARI_BAKU,
 )
 from modules.analysis import tentukan_status_stok, buat_rekomendasi
-from modules.forecasting import hitung_statistik_permintaan
+from modules.forecasting import buat_peramalan_regresi_linear
 from modules.inventory import (
     hitung_kuantitas_pemesanan_ekonomis,
     hitung_biaya_persediaan,
@@ -39,15 +39,13 @@ class LayananPersediaan:
         biaya_pemesanan: Optional[float] = None,
         rasio_biaya_penyimpanan: Optional[float] = None,
         waktu_tunggu_hari: Optional[float] = None,
-        skor_z: Optional[float] = None,
-        permintaan_tahunan_manual: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Menjalankan analisis persediaan untuk satu produk:
         1. Mengambil data produk & harga modal
-        2. Menghitung rata-rata permintaan harian & deviasi dari riwayat penjualan
-        3. Menghitung EOQ, Safety Stock, Reorder Point
-        4. Menyimpan hasil perhitungan ke tabel inventory_analysis di database
+        2. Meramalkan permintaan tahunan dengan regresi linear
+        3. Menghitung EOQ, Safety Stock, dan Reorder Point untuk tiga tahun
+        4. Menyimpan proyeksi tahun pertama ke tabel inventory_analysis
         """
         produk = self.repositori_produk.ambil_berdasarkan_id(id_produk)
         if not produk:
@@ -68,56 +66,74 @@ class LayananPersediaan:
             if waktu_tunggu_hari is not None
             else WAKTU_TUNGGU_HARI_BAKU
         )
-        skor_z = float(
-            skor_z if skor_z is not None else SKOR_Z_TINGKAT_LAYANAN_BAKU
-        )
 
         # Hitung holding cost per unit per tahun (berdasarkan unit_cost * h_rate)
         biaya_satuan = float(produk.get("biaya_satuan", 0))
         biaya_penyimpanan_per_unit = biaya_satuan * rasio_biaya_simpan
         if biaya_penyimpanan_per_unit <= 0:
-            biaya_penyimpanan_per_unit = 1000.0  # Nilai minimal wajar jika unit_cost 0
+            raise ValueError("Biaya satuan produk harus lebih besar dari 0 untuk menghitung biaya simpan.")
 
-        # Ambil statistik penjualan
-        penjualan_harian = self.repositori_penjualan.ambil_penjualan_harian(id_produk, hari=180)
-        kuantitas = [float(baris["total_kuantitas"]) for baris in penjualan_harian]
+        riwayat_tahunan = self.repositori_penjualan.ambil_permintaan_tahunan(id_produk)
+        hasil_peramalan = buat_peramalan_regresi_linear(riwayat_tahunan)
+        proyeksi = []
+        for ramalan in hasil_peramalan["ramalan"]:
+            permintaan_tahunan = float(ramalan["permintaan_tahunan"])
+            if permintaan_tahunan <= 0:
+                raise ValueError(
+                    f"Peramalan permintaan tahun {ramalan['tahun']} harus lebih besar dari 0."
+                )
+            rata_rata_permintaan_harian = permintaan_tahunan / HARI_TAHUNAN_BAKU
+            kuantitas_pemesanan_ekonomis = hitung_kuantitas_pemesanan_ekonomis(
+                permintaan_tahunan,
+                biaya_pemesanan,
+                biaya_penyimpanan_per_unit,
+            )
+            stok_pengaman = hitung_stok_pengaman(
+                rata_rata_permintaan_harian,
+                waktu_tunggu_hari,
+            )
+            titik_pemesanan_ulang = hitung_titik_pemesanan_ulang(
+                rata_rata_permintaan_harian,
+                waktu_tunggu_hari,
+                stok_pengaman,
+            )
+            biaya = hitung_biaya_persediaan(
+                permintaan_tahunan,
+                kuantitas_pemesanan_ekonomis,
+                biaya_pemesanan,
+                biaya_penyimpanan_per_unit,
+            )
+            proyeksi.append(
+                {
+                    **ramalan,
+                    "rata_rata_permintaan_harian": round(
+                        rata_rata_permintaan_harian, 2
+                    ),
+                    "kuantitas_pemesanan_ekonomis": kuantitas_pemesanan_ekonomis,
+                    "stok_pengaman": stok_pengaman,
+                    "titik_pemesanan_ulang": titik_pemesanan_ulang,
+                    **biaya,
+                }
+            )
 
-        statistik = hitung_statistik_permintaan(kuantitas)
-
-        if permintaan_tahunan_manual is not None and permintaan_tahunan_manual > 0:
-            permintaan_tahunan = float(permintaan_tahunan_manual)
-            rata_rata_permintaan_harian = permintaan_tahunan / 365.0
-            simpangan_baku = statistik["simpangan_baku_permintaan_harian"]
-        elif statistik["permintaan_tahunan"] > 0:
-            permintaan_tahunan = statistik["permintaan_tahunan"]
-            rata_rata_permintaan_harian = statistik["rata_rata_permintaan_harian"]
-            simpangan_baku = statistik["simpangan_baku_permintaan_harian"]
-        else:
-            # Fallback jika belum ada data riwayat penjualan yang cukup
-            # Gunakan perkiraan dari minimum_stock atau stok saat ini
-            stok_minimum = float(produk.get("stok_minimum", 10))
-            permintaan_tahunan = max(stok_minimum * 12, 120.0)
-            rata_rata_permintaan_harian = permintaan_tahunan / 365.0
-            simpangan_baku = max(rata_rata_permintaan_harian * 0.25, 1.0)
-
-        # Hitung metode persediaan
-        kuantitas_pemesanan_ekonomis = hitung_kuantitas_pemesanan_ekonomis(permintaan_tahunan, biaya_pemesanan, biaya_penyimpanan_per_unit)
-        stok_pengaman = hitung_stok_pengaman(simpangan_baku, waktu_tunggu_hari, skor_z)
-        titik_pemesanan_ulang = hitung_titik_pemesanan_ulang(rata_rata_permintaan_harian, waktu_tunggu_hari, stok_pengaman)
+        proyeksi_pertama = proyeksi[0]
 
         # Simpan ke database
         baris_tersimpan = self.repositori_analisis.simpan(
             id_produk=id_produk,
-            permintaan_tahunan=permintaan_tahunan,
+            permintaan_tahunan=proyeksi_pertama["permintaan_tahunan"],
             biaya_pemesanan=biaya_pemesanan,
             biaya_penyimpanan_per_unit_tahun=biaya_penyimpanan_per_unit,
-            rata_rata_permintaan_harian=rata_rata_permintaan_harian,
-            simpangan_baku_permintaan_harian=simpangan_baku,
+            rata_rata_permintaan_harian=proyeksi_pertama[
+                "rata_rata_permintaan_harian"
+            ],
+            simpangan_baku_permintaan_harian=0.0,
             waktu_tunggu_hari=waktu_tunggu_hari,
-            skor_z=skor_z,
-            kuantitas_pemesanan_ekonomis=kuantitas_pemesanan_ekonomis,
-            stok_pengaman=stok_pengaman,
-            titik_pemesanan_ulang=titik_pemesanan_ulang,
+            kuantitas_pemesanan_ekonomis=proyeksi_pertama[
+                "kuantitas_pemesanan_ekonomis"
+            ],
+            stok_pengaman=proyeksi_pertama["stok_pengaman"],
+            titik_pemesanan_ulang=proyeksi_pertama["titik_pemesanan_ulang"],
             tanggal_analisis=date.today(),
         )
 
@@ -126,18 +142,20 @@ class LayananPersediaan:
         rekomendasi = buat_rekomendasi(
             nama_produk=produk["nama"],
             stok_saat_ini=stok_saat_ini,
-            titik_pemesanan_ulang=titik_pemesanan_ulang,
-            stok_pengaman=stok_pengaman,
-            kuantitas_pemesanan_ekonomis=kuantitas_pemesanan_ekonomis,
+            titik_pemesanan_ulang=proyeksi_pertama["titik_pemesanan_ulang"],
+            stok_pengaman=proyeksi_pertama["stok_pengaman"],
+            kuantitas_pemesanan_ekonomis=proyeksi_pertama[
+                "kuantitas_pemesanan_ekonomis"
+            ],
         )
-
-        biaya = hitung_biaya_persediaan(permintaan_tahunan, kuantitas_pemesanan_ekonomis, biaya_pemesanan, biaya_penyimpanan_per_unit)
 
         return {
             "produk": produk,
             "analisis": baris_tersimpan,
             "rekomendasi": rekomendasi,
-            "biaya": biaya,
+            "biaya": proyeksi_pertama,
+            "peramalan": hasil_peramalan,
+            "proyeksi": proyeksi,
         }
 
     def analisis_semua_produk(self) -> List[Dict[str, Any]]:

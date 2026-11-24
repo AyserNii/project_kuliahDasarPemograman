@@ -1,3 +1,4 @@
+import math
 from typing import Any, Dict
 from modules.inventory import hitung_biaya_persediaan
 
@@ -65,7 +66,8 @@ def buat_rekomendasi(
     status = tentukan_status_stok(stok_saat_ini, titik_pemesanan_ulang, stok_pengaman)
 
     if status in ("HABIS", "KRITIS", "PERLU REORDER"):
-        tindakan = f"Lakukan pemesanan ulang segera sebesar {kuantitas_pemesanan_ekonomis:.0f} unit (sesuai EOQ)."
+        jumlah_pemesanan = math.ceil(float(kuantitas_pemesanan_ekonomis))
+        tindakan = f"Lakukan pemesanan ulang segera sebesar {jumlah_pemesanan} unit (sesuai EOQ)."
         prioritas = "TINGGI" if status in ("HABIS", "KRITIS") else "SEDANG"
     else:
         tindakan = "Stok masih mencukupi. Pertahankan tingkat persediaan saat ini."

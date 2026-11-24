@@ -170,7 +170,10 @@ class ReportsPage(tk.Frame):
         try:
             daftar_produk = self.repositori_produk.ambil_semua()
             content = hasilkan_laporan_ringkasan_inventaris(daftar_produk)
-            lokasi_berkas = simpan_laporan_teks(content, awalan_nama="laporan_inventaris")
+            lokasi_berkas = simpan_laporan_teks(
+                content,
+                awalan_nama_berkas="laporan_inventaris",
+            )
             messagebox.showinfo("Laporan Tersimpan", f"Laporan teks berhasil disimpan di:\n{lokasi_berkas}", parent=self)
         except Exception as kesalahan:
             messagebox.showerror("Gagal Menyimpan Laporan", str(kesalahan), parent=self)

@@ -1,6 +1,8 @@
 import math
 from typing import Dict
 
+from config.settings import HARI_TAHUNAN_BAKU
+
 def hitung_kuantitas_pemesanan_ekonomis(
     permintaan_tahunan: float,
     biaya_pemesanan: float,
@@ -25,26 +27,21 @@ def hitung_kuantitas_pemesanan_ekonomis(
 
 
 def hitung_stok_pengaman(
-    simpangan_baku_permintaan_harian: float,
+    pemakaian_harian: float,
     waktu_tunggu_hari: float,
-    skor_z: float = 1.65,
 ) -> float:
     """
     Menghitung Safety Stock (Persediaan Pengaman).
-    Rumus: Z * stddev_d * sqrt(L)
-    - Z: Service level factor (misal 1.65 untuk tingkat pelayanan ~95%)
-    - stddev_d: Standar deviasi permintaan harian
+    Rumus jurnal: pemakaian harian * waktu tunggu.
     - L: Waktu tunggu (lead time dalam hari)
     """
-    if simpangan_baku_permintaan_harian < 0:
-        raise ValueError("Standar deviasi permintaan tidak boleh negatif")
+    if pemakaian_harian < 0:
+        raise ValueError("Pemakaian harian tidak boleh negatif")
     if waktu_tunggu_hari < 0:
         raise ValueError("Lead time tidak boleh negatif")
-    if skor_z < 0:
-        raise ValueError("Nilai Z-score tidak boleh negatif")
 
-    nilai_stok_pengaman = float(skor_z) * float(simpangan_baku_permintaan_harian) * math.sqrt(float(waktu_tunggu_hari))
-    return round(nilai_stok_pengaman, 2)
+    nilai_stok_pengaman = float(pemakaian_harian) * float(waktu_tunggu_hari)
+    return float(math.ceil(nilai_stok_pengaman))
 
 
 def hitung_titik_pemesanan_ulang(
@@ -94,7 +91,11 @@ def hitung_biaya_persediaan(
     biaya_penyimpanan_tahunan = (kuantitas / 2) * biaya_simpan
     total_biaya = biaya_pemesanan_tahunan + biaya_penyimpanan_tahunan
     jumlah_pemesanan = permintaan / kuantitas
-    hari_siklus_pemesanan = (kuantitas / permintaan) * 365 if permintaan > 0 else 0
+    hari_siklus_pemesanan = (
+        (kuantitas / permintaan) * HARI_TAHUNAN_BAKU
+        if permintaan > 0
+        else 0
+    )
 
     return {
         "kuantitas_pemesanan": round(kuantitas, 2),
@@ -110,16 +111,14 @@ def analisis_item_persediaan(
     permintaan_tahunan: float,
     biaya_pemesanan: float,
     biaya_penyimpanan_per_unit_tahun: float,
-    rata_rata_permintaan_harian: float,
-    simpangan_baku_permintaan_harian: float,
     waktu_tunggu_hari: float,
-    skor_z: float = 1.65,
 ) -> Dict[str, float]:
     """
     Melakukan perhitungan menyeluruh untuk satu elemen inventaris.
     """
     kuantitas_pemesanan_ekonomis = hitung_kuantitas_pemesanan_ekonomis(permintaan_tahunan, biaya_pemesanan, biaya_penyimpanan_per_unit_tahun)
-    stok_pengaman = hitung_stok_pengaman(simpangan_baku_permintaan_harian, waktu_tunggu_hari, skor_z)
+    rata_rata_permintaan_harian = float(permintaan_tahunan) / HARI_TAHUNAN_BAKU
+    stok_pengaman = hitung_stok_pengaman(rata_rata_permintaan_harian, waktu_tunggu_hari)
     titik_pemesanan_ulang = hitung_titik_pemesanan_ulang(rata_rata_permintaan_harian, waktu_tunggu_hari, stok_pengaman)
     biaya = hitung_biaya_persediaan(permintaan_tahunan, kuantitas_pemesanan_ekonomis, biaya_pemesanan, biaya_penyimpanan_per_unit_tahun)
 

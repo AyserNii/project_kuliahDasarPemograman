@@ -1,0 +1,11 @@
+﻿id_transaksi;kode_transaksi;id_produk;id_pemasok;jenis_transaksi;kuantitas;biaya_satuan;tanggal_transaksi;catatan;sku;nama_produk;nama_pemasok
+22;SALE-5C98D993;31;;OUT;10.00;12000.00;2026-11-24 09:24:32.033657+07:00;Penjualan Pelanggan;BRG-005;CocaCola;
+21;TXN-IN-20261124092402;31;9.0;IN;10.00;12000.00;2026-11-24 09:24:02.255525+07:00;Transaksi IN;BRG-005;CocaCola;PT Cipta Sinergi
+20;SALE-F7A96451;30;;OUT;12.00;500000.00;2026-11-20 11:39:43.242169+07:00;Penjualan Pelanggan;BRG-004;Sabun Cuci Piring;
+19;TXN-IN-20261120113857;30;1.0;IN;15.00;25000.00;2026-11-20 11:38:57.139925+07:00;Transaksi IN;BRG-004;Sabun Cuci Piring;Sumber Pangan Nusantara
+18;SALE-C73560B8;19;;OUT;12.00;12000.00;2026-11-20 08:32:00.634567+07:00;Terjual;BRG-003;Milo;
+17;TXN-IN-20261120083016;19;;IN;1.00;12000.00;2026-11-20 08:30:16.059103+07:00;12000;BRG-003;Milo;
+4;SEED-SALE-002;2;;OUT;5.00;18000.00;2026-11-17 09:36:46.909706+07:00;Penjualan contoh;BRG-002;Teh Melati 100 g;
+3;SEED-SALE-001;1;;OUT;7.00;45000.00;2026-11-16 09:36:46.908327+07:00;Penjualan contoh;BRG-001;Kopi Arabika 250 g;
+2;SEED-IN-002;2;1.0;IN;80.00;18000.00;2026-10-20 09:36:46.906757+07:00;Stok awal;BRG-002;Teh Melati 100 g;Sumber Pangan Nusantara
+1;SEED-IN-001;1;1.0;IN;100.00;45000.00;2026-10-20 09:36:46.894881+07:00;Stok awal;BRG-001;Kopi Arabika 250 g;Sumber Pangan Nusantara
